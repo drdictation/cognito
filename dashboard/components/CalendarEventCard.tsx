@@ -57,7 +57,7 @@ export function CalendarEventCard({ event }: CalendarEventCardProps) {
     const handleApprove = async () => {
         setIsProcessing(true)
         try {
-            const result = await approveDetectedEvent(event.id)
+            const result = await approveDetectedEvent(event.id, isConflict)
             if (result.success) {
                 toast.success('Calendar event created!')
             } else {

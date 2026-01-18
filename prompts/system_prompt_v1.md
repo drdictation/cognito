@@ -68,6 +68,7 @@ Detect if the email contains information about calendar events. Look for:
 2. **Deadline** - Contains "due by", "deadline", "submit before", "by end of", work must be completed BY this time
 3. **Appointment** - Contains "your appointment is", "scheduled for", external commitments (doctor visits, etc.)
 4. **Reminder** - Contains "don't forget", "reminder:", "heads-up", informational only (no time blocking needed)
+5. **Time Blocking** - Explicit commands to "block out calendar", "keep free", "reserve time". Treat as High Confidence.
 
 ### Extraction Rules
 - Extract date/time using context (current date/time will be provided in the prompt)

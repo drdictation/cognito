@@ -3,6 +3,7 @@ import { BriefingView } from '@/components/BriefingView'
 import { NoFlyZoneIndicator } from '@/components/NoFlyZoneIndicator'
 import { RefreshButton } from '@/components/RefreshButton'
 import { AddTaskButton } from '@/components/AddTaskButton'
+import { PendingEventsList } from '@/components/PendingEventsList'
 import { Calendar } from 'lucide-react'
 
 
@@ -49,6 +50,9 @@ export default async function DailyBriefingPage() {
           <p className="text-sm text-muted-foreground mt-1">{error}</p>
         </div>
       )}
+
+      {/* Pending Calendar Events */}
+      <PendingEventsList />
 
       {/* Briefing Content */}
       <BriefingView tasks={tasks} />
