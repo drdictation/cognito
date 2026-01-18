@@ -8,7 +8,8 @@ import { Calendar } from 'lucide-react'
 
 
 // Revalidate every 30 seconds
-export const revalidate = 30
+// Force dynamic rendering to avoid build-time Supabase errors
+export const dynamic = 'force-dynamic'
 
 export default async function DailyBriefingPage() {
   const { tasks, error } = await getPendingTasks()

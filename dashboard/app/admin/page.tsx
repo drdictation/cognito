@@ -3,8 +3,8 @@ import { BlocklistManager } from '@/components/BlocklistManager'
 import { NoFlyZoneIndicator } from '@/components/NoFlyZoneIndicator'
 import { Settings } from 'lucide-react'
 
-// Revalidate every 60 seconds
-export const revalidate = 60
+// Force dynamic rendering to avoid build-time Supabase errors
+export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
     const { entries, error } = await getBlocklist()

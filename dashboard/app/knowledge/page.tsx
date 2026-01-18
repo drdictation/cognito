@@ -4,7 +4,8 @@ import { ContactsManager } from '@/lib/../components/ContactsManager'
 import { SuggestionsList } from '@/lib/../components/SuggestionsList'
 import { BookOpen, Users } from 'lucide-react'
 
-export const revalidate = 0 // Dynamic
+// Force dynamic rendering to avoid build-time Supabase errors
+export const dynamic = 'force-dynamic'
 
 export default async function KnowledgePage() {
     const knowledge = await getAllKnowledge()
