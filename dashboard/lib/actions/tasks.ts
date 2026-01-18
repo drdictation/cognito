@@ -126,7 +126,7 @@ export async function updateTaskStatus(
 
 export async function tweakTask(
     taskId: string,
-    updates: { priority?: Priority; domain?: Domain },
+    updates: { priority?: Priority; domain?: Domain; estimatedMinutes?: number },
     originalTask: InboxTask
 ): Promise<{ success: boolean; error?: string }> {
     const supabase = createAdminClient()
@@ -138,6 +138,9 @@ export async function tweakTask(
     }
     if (updates.domain) {
         updateData.ai_domain = updates.domain
+    }
+    if (updates.estimatedMinutes !== undefined) {
+        updateData.ai_estimated_minutes = updates.estimatedMinutes
     }
 
     // Update the task
@@ -152,6 +155,12 @@ export async function tweakTask(
     }
 
     // Log the decision for learning
+    // Determine correction type
+    const correctionTypes: string[] = []
+    if (updates.priority) correctionTypes.push('priority')
+    if (updates.domain) correctionTypes.push('domain')
+    if (updates.estimatedMinutes !== undefined) correctionTypes.push('time')
+
     const { error: logError } = await (supabase
         .from('decision_log') as any)
         .insert({
@@ -160,13 +169,10 @@ export async function tweakTask(
                 priority: originalTask.ai_priority,
                 domain: originalTask.ai_domain,
                 summary: originalTask.ai_summary,
+                estimated_minutes: originalTask.ai_estimated_minutes,
             },
             user_correction: updates,
-            correction_type: updates.priority && updates.domain
-                ? 'priority_and_domain'
-                : updates.priority
-                    ? 'priority'
-                    : 'domain',
+            correction_type: correctionTypes.join('_and_') || 'unknown',
         })
 
     if (logError) {

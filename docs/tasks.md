@@ -24,7 +24,8 @@
 - [x] **Trello Integration:**
   - [x] Create cards in "Cognito Tasks" board.
   - [x] Map deadlines to Due Dates.
-  - [x] Rich description injection (Summary + Context + Draft).
+  - [x] Rich description injection (Summary + Context + Draft + Full Email Content with recursive parsing).
+  - [x] Trello Guardrails (16k char truncation).
 - [x] **Calendar Integration (Time Blocking):**
   - [x] AI estimates task duration (`estimated_minutes`).
   - [x] Algorithm finds next free slot (9am-5pm).
@@ -67,9 +68,24 @@
   - [x] **Priority Bumping:** Automatic rescheduling of lower-priority Cognito tasks for Critical arrivals.
   - [x] **Dynamic Scheduling:** Added 9am-12pm Tue slots and Critical overflow (7:30pm-10pm).
   - [x] **Dashboard Integration:** Calendar event cards, bump notifications, and undo/redo logic.
+  - [x] **Decoupled Approval:** Added "Pending Schedule Items" list at the top of the dashboard for visibility after task approval.
+  - [x] **Conflict Override:** Implemented "Force Approve" (Create Anyway) for calendar events with conflicts.
+  - [x] **Enhanced Tweak UI:** Refined visual selection feedback and manual adjustment of estimated task duration.
   - [x] **Database Schema:** `detected_events`, `cognito_events`, `scheduling_windows`, `protected_calendars`.
 
-## 🔵 Phase 8: Expansion [Future]
+
+## 🟢 Phase 8: Vercel Production Readiness [Completed]
+- [x] **TypeScript Ingestion Port:** Rewrote Python ingestion logic into native TypeScript services (`gmail.ts`, `ingestion.ts`).
+- [x] **Env-Based Auth:** Migrated from file-based `credentials.json`/`token.json` to secure environment variables (`GOOGLE_CLIENT_ID`, etc.).
+- [x] **Shared Auth Utility:** Created a centralized `google-auth.ts` for authenticated Google clients.
+- [x] **Vercel Compatibility:** Removed all filesystem and `child_process` dependencies (system prompt now embedded in `llm.ts`).
+- [x] **Robust Extraction:** Increased token limits (2500) and added JSON repair logic for better event detection performance.
+- [x] **Multipart Email Support:** Implemented recursive MIME parsing in `gmail.ts` to capture full body content from forwarded and nested emails.
+- [x] **Trello Guardrails:** Added automatic description truncation (16,384 char limit) to prevent Trello API errors on massive emails.
+- [x] **Successful Build:** Verified local and production builds with full feature parity.
+
+
+## 🔵 Phase 9: Expansion [Future]
 - [ ] **Mobile App:** React Native wrapper for on-the-go triage.
 - [ ] **Math Alert:** Conflict detection logic.
 

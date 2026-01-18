@@ -78,7 +78,16 @@
     * **Priority-Based Bumping:** Critical tasks automatically reschedule lower-priority "Focus Time" blocks.
     * **Protected Calendars:** Any event on a calendar named "ICLOUD" is immune to bumping.
     * **Scheduling Windows:** Expanded availability (9am-12pm Tuesdays) and critical overflow windows (7:30pm-10pm).
+    * **Event Triage UI:** Dedicated "Pending Schedule Items" list for decoupling event approval from task approval.
+    * **Conflict Management:** "Create Anyway" functionality to override scheduling conflicts.
+    * **Enhanced Triage Controls:** Refined Tweak UI with visual selection feedback and manual time overrides.
     * **Undo Logic:** One-click restoration of original schedule from the dashboard.
+* **Production Readiness (Phase 8) [Completed]**
+    * **Vercel Optimization:** Full migration of ingestion logic to TypeScript for serverless compatibility.
+    * **Cloud Auth:** Transition to environment-variable-based Google OAuth (no filesystem dependencies).
+    * **Centralized API:** Unified Google Auth and Gmail services for consistent cross-app access.
+    * **Embedded Intelligence:** System prompt embedded in service code to eliminate file-read overhead.
+
 
 ## 4. Success Metrics
 * **Accuracy:** User accepts >80% of AI prioritization suggestions without editing.

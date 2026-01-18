@@ -14,12 +14,10 @@ Cognito is a bespoke AI Executive Assistant designed to reduce cognitive load fo
 - ✅ User reviews and approves
 - ❌ No autonomous execution (Phase 1)
 
----
-
 ## 🏗️ Architecture Overview
 
 ```
-6 Email Sources → Central Gmail Hub → Python Ingestion Script → Gemini AI → Supabase
+6 Email Sources → Central Gmail Hub → TypeScript Ingestion Service → Gemini AI → Supabase
 ```
 
 ### The Email Funnel
@@ -33,18 +31,17 @@ Instead of managing 6 different API connections, all emails are auto-forwarded t
 5. **Gmail C** (Private Practice) - Clinical
 6. **Hotmail** (Legacy) - Home
 
-The Python script parses forwarded email headers to identify the **original sender** and source account.
+The TypeScript service parses forwarded email headers to identify the **original sender** and source account.
 
 ---
 
-## 🚀 Phase 1-7: Complete System (Current)
+## 🚀 Phase 1-8: Complete System (Current)
 
 ### Features
 
 #### 🧠 Intelligence Layer
 - **Multi-Model Routing:** 
-    - 70% traffic: **Gemini 2.5 Flash Lite** (Speed/Cost)
-    - 30% traffic: **Groq/Llama-4-Scout** (Deep Thinking/Reasoning)
+    - **Gemini 2.0 Flash Lite** (Speed/Cost/Reasoning)
 - **Email Analysis:** Domain classification, Priority scoring (Eisenhower Matrix), Summary generation.
 - **Draft Generation:** Auto-drafts responses for "Simple" emails (signed as "Chamara").
 - **Manual Task Analysis:** Real-time classification of hand-written or dictated notes.
@@ -60,10 +57,14 @@ The Python script parses forwarded email headers to identify the **original send
 - **Knowledge Base:** Editable domain-specific "cheat sheets" to train the AI's judgment and tone.
 - **Proactive Learning:** AI proposes new rules and contacts based on your approval patterns.
 - **Bump Notifications:** Visual alerts for rescheduled tasks with "Undo" capabilities.
+- **Pending Schedule Items:** Decoupled list for triaging extracted calendar events independently of task approval.
+- **Conflict Override:** "Force Approve" capability for overlapping calendar events.
+- **Enhanced Tweak Capability:** Refined UI with visual selection feedback and manual adjustment of estimated task duration.
 - **Live Updates:** Real-time task management.
 
 #### ⚡ Execution Engine
-- **Trello Integration:** Approved tasks automatically create Trello cards with rich context.
+- **Trello Integration:** Approved tasks automatically create Trello cards with rich context (Summary, Suggestions, and full email content via recursive MIME extraction).
+- **Trello Guardrails:** Built-in protection against API limits with automatic 16,384-character description truncation.
 - **Calendar Integration:** "Time Blocking" - AI estimates duration and finds free slots in Google Calendar.
 - **Intelligent Scheduling:** Dynamic slots (8pm-9:30pm Sun-Thu, 9am-12pm Tue) and Critical task overflow windows.
 - **Smart Bumping:** Critical tasks automatically push lower-priority "Focus Time" blocks to the next available slot.
@@ -71,6 +72,7 @@ The Python script parses forwarded email headers to identify the **original send
 
 #### 🛡️ Ingestion Pipeline
 - **Central Hub:** Aggregates 6 email sources.
+- **TypeScript Core:** Native processing within Next.js (Vercel-ready).
 - **Blocklist:** Filters spam/newsletters.
 - **No-Fly Zone:** Silent ingestion during weekends (Friday 17:00 - Sunday 18:00).
 
@@ -82,7 +84,7 @@ The Python script parses forwarded email headers to identify the **original send
 - **Node.js 18+** (for Dashboard)
 - **Google AI Studio Key** (Gemini)
 - **Groq API Key** (Llama-3)
-- **Google Cloud Credentials** (Gmail/Calendar)
+- **Google Cloud Credentials** (Client ID, Secret, Refresh Token)
 - **Supabase Account**
 - **Trello API Key/Token**
 
@@ -90,20 +92,17 @@ The Python script parses forwarded email headers to identify the **original send
 
 ## 🔧 Setup Instructions
 
-### 1. Backend Setup (Python)
+### 1. Database Setup (Supabase)
 
-```bash
-cd /path/to/cognito
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+1. Create a project at [Supabase](https://supabase.com).
+2. Run the `schema.sql` (found in `supabase/`) in the SQL Editor.
 
-### 2. Frontend Setup (Next.js)
+### 2. Dashboard Setup (Next.js)
 
 ```bash
 cd dashboard
 npm install
+npm run dev
 ```
 
 ### 3. Environment Variables (.env)
@@ -116,8 +115,9 @@ GOOGLE_AI_API_KEY=AIzaSy...
 GROQ_API_KEY=gsk_...
 
 # Google Cloud (Gmail/Calendar)
-GMAIL_CREDENTIALS_PATH=./credentials.json
-GMAIL_TOKEN_PATH=./token.json
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_SECRET=your_client_secret
+GOOGLE_REFRESH_TOKEN=your_refresh_token
 
 # Supabase
 SUPABASE_URL=https://your-project.supabase.co
@@ -133,18 +133,13 @@ CENTRAL_HUB_EMAIL=chamarabfwd@gmail.com
 
 ### 4. Running the System
 
-**1. Ingestion Engine (Backend):**
-```bash
-# Process new emails
-python src/scripts/ingest_hub.py
-```
-
-**2. Dashboard (Frontend):**
+**Dashboard & Ingestion:**
 ```bash
 cd dashboard
 npm run dev
 # Open http://localhost:3000
 ```
+Ingestion is triggered via the **Refresh** button on the dashboard.
 
 ---
 
@@ -157,10 +152,10 @@ npm run dev
 Central Gmail Hub
        │
        ▼
-Ingestion Script ──▶ Blocklist / No-Fly Zone
+Ingestion Service ──▶ Blocklist / No-Fly Zone
        │
        ▼
-LLM Router (Gemini / Groq)
+LLM Engine (Gemini 2.0 Flash)
        │
        ▼
 Supabase (Inbox Queue)

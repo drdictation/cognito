@@ -1,4 +1,4 @@
-# Cognito Architecture - Complete System (Phases 1-7)
+# Cognito Architecture - Complete System (Phases 1-8)
 
 ## System Overview
 
@@ -21,12 +21,13 @@ Cognito is a "Decision Support First" AI Executive Assistant. It aggregates emai
                 │
                 ▼
 ┌────────────────────────────────────────┐
-│      PYTHON INGESTION ENGINE           │
+│     TYPESCRIPT INGESTION SERVICE       │
+│  (lib/services/ingestion.ts)           │
 │  ┌──────────────────────────────────┐  │
 │  │ 1. Fetch & Parse (Gmail API)     │  │
 │  │ 2. Blocklist / No-Fly Zone       │  │
-│  │ 3. LLM ROUTER (Hybrid AI)        │──┼──▶ Gemini 2.5 Flash Lite (70%)
-│  │    - Triage & Priority           │──┼──▶ Groq Llama-3-70b (30%)
+│  │ 3. LLM ENGINE (Gemini 2.0 Flash) │──┼──▶ Gemini 2.0 Flash Lite
+│  │    - Triage & Priority           │  │
 │  │    - Draft Generation            │  │
 │  │ 4. Save to Supabase              │  │
 │  └──────────────────────────────────┘  │
@@ -47,7 +48,7 @@ Cognito is a "Decision Support First" AI Executive Assistant. It aggregates emai
 │  │ - Manual Task Addition           ├──┼──▶ Groq Whisper (Voice)
 │  │   (Write / Dictate)              │──┼──▶ Gemini (Analysis)
 │  │ - Knowledge Base Editor          │──┼──▶ Two-Pass Prompting
-│  │ - Tweak (Feedback Loop)          │  │
+│  │ - Tweak (Manual Override UI)      │  │
 │  └────────────────┬─────────────────┘  │
 └───────────────────┼────────────────────┘
                     │
@@ -65,20 +66,18 @@ Cognito is a "Decision Support First" AI Executive Assistant. It aggregates emai
 
 ## Component Details
 
-### 1. Ingestion & Routing (Python)
+### 1. Ingestion & Routing (TypeScript)
 
-**Script:** `src/scripts/ingest_hub.py` runs on a schedule (Cron).
+**Service:** `lib/services/ingestion.ts` handles the core ingestion logic, triggered via Next.js Server Actions.
 
-#### Hybrid Intelligence Engine (`llm_router.py`)
-Instead of relying on a single model, Cognito uses a probabilistic router to balance speed/cost with reasoning depth.
-
-| Model | Probability | Use Case |
-|-------|-------------|----------|
-| **Gemini 2.5 Flash Lite** | 70% | Routine triage, simple categorization, fast drafting. |
-| **Groq (Llama-3-70b)** | 30% | "Thinking" mode. Complex reasoning, deep priority conflicts. |
+#### Intelligence Engine (`llm.ts`)
+Cognito uses **Gemini 2.0 Flash Lite** for speed, cost, and high-quality triage.
 
 **System Prompt:**
-The prompt enforces the "Eisenhower Matrix" logic tailored to the user's specific roles (Clinician, Researcher, Admin).
+The prompt (embedded in `llm.ts`) enforces the "Eisenhower Matrix" logic tailored to the user's specific roles (Clinician, Researcher, Admin).
+
+#### Google Authentication (`google-auth.ts`)
+Authentication is handled via environment variables (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`), enabling full serverless compatibility on Vercel without reliance on local JSON files.
 
 ---
 
@@ -124,7 +123,8 @@ When a user clicks **"Approve"**, the system orchestrates multiple APIs API call
     * **Slot Finder:** Scans Google Calendar for available slots within `scheduling_windows`.
     * **Priority Bumping:** For Critical tasks, the system can "bump" existing Cognito-managed Focus Time blocks to future slots within their respective deadlines.
     * **Booking:** Creates a private "Focus Time" event with extended properties tracking `task_id`, `priority`, and `deadline`.
-    * **Event Approval:** AI-detected events are presented as cards in the dashboard for manual approval/edit/rejection.
+    * **Event Approval:** AI-detected events are presented in a dedicated "Pending Schedule Items" list at the top of the dashboard. This allows for approval/edit/rejection even after the main task has been moved to Trello.
+    * **Conflict Management:** Users can "Force Approve" (Create Anyway) events if they choose to overlap with existing appointments.
 
 
 ---
@@ -144,6 +144,11 @@ Updated schema includes fields for all phases:
 | `deadline_source` | TEXT | Source of deadline (AI, manual, or default). |
 | `trello_card_id` | TEXT | ID of created Trello card. |
 | `calendar_event_id` | TEXT | ID of created Calendar block. |
+| `scheduled_start` | TIMESTAMP | Start time of scheduled work block. |
+| `scheduled_end` | TIMESTAMP | End time of scheduled work block. |
+| `execution_status` | TEXT | pending, scheduled, failed, skipped. |
+| `executed_at` | TIMESTAMP | When the task was last actioned. |
+
 
 ### `detected_events` Table (Phase 7b)
 Stores AI-extracted calendar events linked to inbox tasks.
@@ -178,11 +183,11 @@ Tracks events created by Cognito for bumping purposes.
 
 ## Deploying
 
-### Production (Future)
-The system is designed to run in a hybrid environment:
-1.  **Backend:** Cloudflare Worker or Python Serverless Function (triggering `ingest_hub.py`).
-2.  **Frontend:** Vercel (hosting the Next.js Dashboard).
-3.  **Database:** Supabase Managed.
+### Production
+The system is fully optimized for Vercel deployment:
+1.  **Backend/Frontend:** Next.js Hosted on Vercel. Ingestion triggered via the "Refresh" button (Server Action).
+2.  **Database:** Supabase Managed.
+3.  **Auth:** Environment-variable-only Google OAuth.
 
 
 ---
@@ -212,14 +217,14 @@ The system is designed to run in a hybrid environment:
                 │
                 ▼
 ┌────────────────────────────────────────┐
-│      PYTHON INGESTION SCRIPT           │
+│     TYPESCRIPT INGESTION SERVICE       │
 │  ┌──────────────────────────────────┐  │
-│  │ 1. Fetch Unread Emails (Gmail API)│ │
-│  │ 2. Extract Original Sender         │ │
-│  │ 3. Check Blocklist                 │ │
-│  │ 4. Check No-Fly Zone               │ │
-│  │ 5. Analyze with Gemini Flash       │ │
-│  │ 6. Save to Supabase                │ │
+│  │ 1. Fetch Unread (Gmail API)      │  │
+│  │ 2. Extract Original Sender         │  │
+│  │ 3. Check Blocklist                 │  │
+│  │ 4. Check No-Fly Zone               │  │
+│  │ 5. Analyze with Gemini Flash       │  │
+│  │ 6. Save to Supabase                │  │
 │  └──────────────────────────────────┘  │
 └───────────────┬────────────────────────┘
                 │

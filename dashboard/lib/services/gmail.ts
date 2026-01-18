@@ -15,6 +15,57 @@ export interface Email {
     headers: Record<string, string>
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GmailPart = any
+
+/**
+ * Recursively extract text content from email parts.
+ * Handles nested multipart MIME structures (common in forwarded emails).
+ * Prefers text/plain, falls back to text/html (stripped of tags).
+ */
+function extractTextFromParts(part: GmailPart | null | undefined): string {
+    if (!part) return ''
+
+    // If this part has direct body data
+    if (part.body?.data) {
+        const content = Buffer.from(part.body.data, 'base64').toString('utf-8')
+
+        if (part.mimeType === 'text/plain') {
+            return content
+        } else if (part.mimeType === 'text/html') {
+            // Strip HTML tags as a fallback
+            return content
+                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                .replace(/<[^>]+>/g, '')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/\s+/g, ' ')
+                .trim()
+        }
+    }
+
+    // Recursively search nested parts
+    if (part.parts && Array.isArray(part.parts)) {
+        // First pass: look for text/plain
+        for (const subPart of part.parts) {
+            if (subPart.mimeType === 'text/plain' && subPart.body?.data) {
+                return Buffer.from(subPart.body.data, 'base64').toString('utf-8')
+            }
+        }
+
+        // Second pass: recursively search each part (for deeply nested structures)
+        for (const subPart of part.parts) {
+            const text = extractTextFromParts(subPart)
+            if (text) return text
+        }
+    }
+
+    return ''
+}
+
 /**
  * Fetch unread emails from Gmail
  */
@@ -79,18 +130,8 @@ export async function getEmailDetails(messageId: string): Promise<Email | null> 
             }
         }
 
-        // Extract body
-        let body = ''
-        if (message.payload?.parts) {
-            for (const part of message.payload.parts) {
-                if (part.mimeType === 'text/plain' && part.body?.data) {
-                    body = Buffer.from(part.body.data, 'base64').toString('utf-8')
-                    break
-                }
-            }
-        } else if (message.payload?.body?.data) {
-            body = Buffer.from(message.payload.body.data, 'base64').toString('utf-8')
-        }
+        // Extract body using recursive helper for nested multipart emails
+        const body = extractTextFromParts(message.payload) || ''
 
         return {
             id: messageId,

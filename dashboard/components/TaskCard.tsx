@@ -58,7 +58,7 @@ export function TaskCard({ task, index }: TaskCardProps) {
     const [showDraftEditor, setShowDraftEditor] = useState(
         !!(task.draft_response || task.is_simple_response)
     )
-    const [tweakUpdates, setTweakUpdates] = useState<{ priority?: Priority; domain?: Domain }>({})
+    const [tweakUpdates, setTweakUpdates] = useState<{ priority?: Priority; domain?: Domain; estimatedMinutes?: number }>({})
     const [detectedEvents, setDetectedEvents] = useState<DetectedEventRow[]>([])
 
     const priority = task.ai_priority || 'Normal'
@@ -105,16 +105,17 @@ export function TaskCard({ task, index }: TaskCardProps) {
     }
 
     async function handleTweak() {
-        if (!tweakUpdates.priority && !tweakUpdates.domain) {
+        if (!tweakUpdates.priority && !tweakUpdates.domain && tweakUpdates.estimatedMinutes === undefined) {
             setIsTweaking(false)
             return
         }
 
         setIsLoading(true)
         try {
-            const updates: { priority?: Priority; domain?: Domain } = {}
+            const updates: { priority?: Priority; domain?: Domain; estimatedMinutes?: number } = {}
             if (tweakUpdates.priority) updates.priority = tweakUpdates.priority
             if (tweakUpdates.domain) updates.domain = tweakUpdates.domain
+            if (tweakUpdates.estimatedMinutes !== undefined) updates.estimatedMinutes = tweakUpdates.estimatedMinutes
 
             const result = await tweakTask(task.id, updates, task)
 
@@ -291,36 +292,105 @@ export function TaskCard({ task, index }: TaskCardProps) {
                                 <div className="space-y-2">
                                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Change Priority</label>
                                     <div className="flex flex-wrap gap-2">
-                                        {(Object.keys(priorityConfig) as Priority[]).map((p) => (
-                                            <button
-                                                key={p}
-                                                onClick={() => setTweakUpdates(prev => ({ ...prev, priority: p }))}
-                                                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${(tweakUpdates.priority || task.ai_priority) === p
-                                                    ? 'bg-primary/20 border-primary text-primary'
-                                                    : 'bg-card border-border text-muted-foreground hover:bg-secondary/80'
-                                                    }`}
-                                            >
-                                                {p}
-                                            </button>
-                                        ))}
+                                        {(Object.keys(priorityConfig) as Priority[]).map((p) => {
+                                            const isSelected = tweakUpdates.priority === p
+                                            const isCurrentValue = !tweakUpdates.priority && task.ai_priority === p
+                                            return (
+                                                <button
+                                                    key={p}
+                                                    onClick={() => setTweakUpdates(prev => ({ ...prev, priority: p }))}
+                                                    className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-150 active:scale-95 ${isSelected
+                                                            ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/30 shadow-md'
+                                                            : isCurrentValue
+                                                                ? 'bg-primary/10 border-primary/50 text-primary'
+                                                                : 'bg-card border-border text-muted-foreground hover:bg-secondary/80 hover:border-primary/30'
+                                                        }`}
+                                                >
+                                                    {isSelected && <Check size={12} className="inline mr-1" />}
+                                                    {p}
+                                                </button>
+                                            )
+                                        })}
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Change Domain</label>
                                     <div className="flex flex-wrap gap-2">
-                                        {(Object.keys(domainConfig) as Domain[]).map((d) => (
+                                        {(Object.keys(domainConfig) as Domain[]).map((d) => {
+                                            const isSelected = tweakUpdates.domain === d
+                                            const isCurrentValue = !tweakUpdates.domain && task.ai_domain === d
+                                            return (
+                                                <button
+                                                    key={d}
+                                                    onClick={() => setTweakUpdates(prev => ({ ...prev, domain: d }))}
+                                                    className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-150 active:scale-95 ${isSelected
+                                                            ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/30 shadow-md'
+                                                            : isCurrentValue
+                                                                ? 'bg-primary/10 border-primary/50 text-primary'
+                                                                : 'bg-card border-border text-muted-foreground hover:bg-secondary/80 hover:border-primary/30'
+                                                        }`}
+                                                >
+                                                    {isSelected && <Check size={12} className="inline mr-1" />}
+                                                    {domainConfig[d].icon} {d}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Estimated Time Control */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                                        <Timer size={14} />
+                                        Estimated Time
+                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-1 bg-card rounded-lg border border-border p-1">
                                             <button
-                                                key={d}
-                                                onClick={() => setTweakUpdates(prev => ({ ...prev, domain: d }))}
-                                                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${(tweakUpdates.domain || task.ai_domain) === d
-                                                    ? 'bg-primary/20 border-primary text-primary'
-                                                    : 'bg-card border-border text-muted-foreground hover:bg-secondary/80'
-                                                    }`}
+                                                onClick={() => {
+                                                    const current = tweakUpdates.estimatedMinutes ?? task.ai_estimated_minutes ?? 30
+                                                    setTweakUpdates(prev => ({ ...prev, estimatedMinutes: Math.max(5, current - 5) }))
+                                                }}
+                                                className="p-1.5 rounded hover:bg-secondary/80 transition-colors active:scale-95"
+                                                aria-label="Decrease time"
                                             >
-                                                {domainConfig[d].icon} {d}
+                                                <Minus size={16} />
                                             </button>
-                                        ))}
+                                            <span className="min-w-[4rem] text-center font-medium text-sm">
+                                                {tweakUpdates.estimatedMinutes ?? task.ai_estimated_minutes ?? 30} min
+                                            </span>
+                                            <button
+                                                onClick={() => {
+                                                    const current = tweakUpdates.estimatedMinutes ?? task.ai_estimated_minutes ?? 30
+                                                    setTweakUpdates(prev => ({ ...prev, estimatedMinutes: Math.min(240, current + 5) }))
+                                                }}
+                                                className="p-1.5 rounded hover:bg-secondary/80 transition-colors active:scale-95"
+                                                aria-label="Increase time"
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1">
+                                            {[5, 15, 30, 45, 60, 90, 120].map((mins) => {
+                                                const isSelected = tweakUpdates.estimatedMinutes === mins
+                                                const isCurrentValue = tweakUpdates.estimatedMinutes === undefined && task.ai_estimated_minutes === mins
+                                                return (
+                                                    <button
+                                                        key={mins}
+                                                        onClick={() => setTweakUpdates(prev => ({ ...prev, estimatedMinutes: mins }))}
+                                                        className={`px-2 py-1 rounded text-xs font-medium border transition-all duration-150 active:scale-95 ${isSelected
+                                                                ? 'bg-primary border-primary text-primary-foreground shadow-sm'
+                                                                : isCurrentValue
+                                                                    ? 'bg-primary/10 border-primary/50 text-primary'
+                                                                    : 'bg-card border-border text-muted-foreground hover:bg-secondary/80'
+                                                            }`}
+                                                    >
+                                                        {mins}m
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -328,7 +398,7 @@ export function TaskCard({ task, index }: TaskCardProps) {
                                 <div className="flex gap-2 mt-4">
                                     <button
                                         onClick={handleTweak}
-                                        disabled={isLoading || (!tweakUpdates.priority && !tweakUpdates.domain)}
+                                        disabled={isLoading || (!tweakUpdates.priority && !tweakUpdates.domain && tweakUpdates.estimatedMinutes === undefined)}
                                         className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Apply Changes

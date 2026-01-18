@@ -200,13 +200,25 @@ ${task.original_content || 'No content provided'}
 *Created by Cognito AI Executive Assistant*
 *Task ID: ${task.id}*`
 
+    // Trello has a 16,384 character limit for card descriptions
+    const TRELLO_DESC_LIMIT = 16384
+    const truncationNote = '\n\n---\n*⚠️ Content truncated due to length. View full email in source.*'
+
+    let finalDescription = description
+    if (description.length > TRELLO_DESC_LIMIT) {
+        // Reserve space for truncation note
+        const maxLength = TRELLO_DESC_LIMIT - truncationNote.length
+        finalDescription = description.substring(0, maxLength) + truncationNote
+        console.log(`Trello description truncated from ${description.length} to ${TRELLO_DESC_LIMIT} chars`)
+    }
+
     try {
         const params = new URLSearchParams({
             key: TRELLO_API_KEY!,
             token: TRELLO_TOKEN!,
             idList: listId,
             name: title,
-            desc: description,
+            desc: finalDescription,
             pos: 'top'
         })
 
