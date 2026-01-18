@@ -1,0 +1,27 @@
+# =====================================================
+# COGNITO PYTHON DEPENDENCIES
+# Install with: pip install -r requirements.txt
+# =====================================================
+
+# Google Gemini AI
+google-generativeai>=0.8.0
+
+# Gmail API
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.0.0
+
+# Supabase Database
+supabase>=2.0.0
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# HTTP Requests (Trello API - Phase 3a)
+requests>=2.31.0
+
+# Testing (optional)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+groq>=0.4.0
