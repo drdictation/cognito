@@ -4,14 +4,8 @@
  * Uses the existing token.json from Python scripts.
  */
 
-import { google, calendar_v3 } from 'googleapis'
-import { OAuth2Client } from 'google-auth-library'
-import * as fs from 'fs'
-import * as path from 'path'
-
-// Path to credentials (relative to project root)
-const CREDENTIALS_PATH = path.join(process.cwd(), '..', 'credentials.json')
-const TOKEN_PATH = path.join(process.cwd(), '..', 'token.json')
+import { calendar_v3 } from 'googleapis'
+import { getCalendarClient } from './google-auth'
 
 // Working hours for scheduling (Melbourne time)
 // User's availability: 8pm - 9:30pm on Sun, Mon, Tue, Wed, Thu
@@ -22,78 +16,6 @@ const TIMEZONE = 'Australia/Melbourne'
 
 // Days when tasks can be scheduled (0 = Sunday, 6 = Saturday)
 const WORK_DAYS = [0, 1, 2, 3, 4]  // Sunday, Monday, Tuesday, Wednesday, Thursday
-
-interface CalendarCredentials {
-    installed?: {
-        client_id: string
-        client_secret: string
-        redirect_uris: string[]
-    }
-    web?: {
-        client_id: string
-        client_secret: string
-    }
-}
-
-interface TokenData {
-    token: string
-    refresh_token: string
-    token_uri: string
-    client_id: string
-    client_secret: string
-    scopes: string[]
-    expiry?: string
-}
-
-/**
- * Get authenticated Google Calendar client using existing token.
- */
-async function getCalendarClient(): Promise<calendar_v3.Calendar | null> {
-    try {
-        // Check if credentials and token exist
-        if (!fs.existsSync(CREDENTIALS_PATH)) {
-            console.error('Credentials file not found:', CREDENTIALS_PATH)
-            return null
-        }
-        if (!fs.existsSync(TOKEN_PATH)) {
-            console.error('Token file not found:', TOKEN_PATH)
-            return null
-        }
-
-        // Load credentials
-        const credentialsContent = fs.readFileSync(CREDENTIALS_PATH, 'utf-8')
-        const credentials: CalendarCredentials = JSON.parse(credentialsContent)
-        const clientConfig = credentials.installed || credentials.web
-
-        if (!clientConfig) {
-            console.error('Invalid credentials format')
-            return null
-        }
-
-        // Load token
-        const tokenContent = fs.readFileSync(TOKEN_PATH, 'utf-8')
-        const tokenData: TokenData = JSON.parse(tokenContent)
-
-        // Create OAuth2 client
-        const auth = new OAuth2Client(
-            clientConfig.client_id,
-            clientConfig.client_secret,
-            credentials.installed?.redirect_uris?.[0]
-        )
-
-        auth.setCredentials({
-            access_token: tokenData.token,
-            refresh_token: tokenData.refresh_token,
-            expiry_date: tokenData.expiry ? new Date(tokenData.expiry).getTime() : undefined
-        })
-
-        // Return calendar client
-        return google.calendar({ version: 'v3', auth })
-    } catch (e) {
-        console.error('Failed to initialize calendar client:', e)
-        return null
-    }
-}
 
 interface TimeSlot {
     start: Date

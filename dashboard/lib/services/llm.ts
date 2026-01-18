@@ -2,25 +2,11 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { AIAssessment } from '@/lib/types/database'
-import * as fs from 'fs'
-import * as path from 'path'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
-// Load system prompt from file
-const SYSTEM_PROMPT_PATH = path.join(process.cwd(), '..', 'prompts', 'system_prompt_v1.md')
-
-function getSystemPrompt(): string {
-    try {
-        if (fs.existsSync(SYSTEM_PROMPT_PATH)) {
-            return fs.readFileSync(SYSTEM_PROMPT_PATH, 'utf-8')
-        }
-    } catch (e) {
-        console.error('Failed to load system prompt from file:', e)
-    }
-
-    // Fallback to embedded prompt
-    return `You are "Cognito," the bespoke AI Executive Assistant for a Consultant Gastroenterologist and PhD Supervisor who also develops Micro-SaaS software. Your mission is to triage incoming tasks into a "Proposed Plan" that reduces cognitive load.
+// Embedded system prompt (no filesystem dependency for Vercel compatibility)
+const SYSTEM_PROMPT = `You are "Cognito," the bespoke AI Executive Assistant for a Consultant Gastroenterologist and PhD Supervisor who also develops Micro-SaaS software. Your mission is to triage incoming tasks into a "Proposed Plan" that reduces cognitive load.
 
 ## User Persona
 - Clinical (Public/Private): Specializes in IBD, Endoscopy, and Functional Gut.
@@ -57,11 +43,27 @@ function getSystemPrompt(): string {
 4. Home: Family, school, kids, social, household.
 5. Hobby: Micro-SaaS, coding, GitHub, DrDictation, Cognito.
 
+## Deadline Inference Rules
+Extract deadlines from the email content. Look for:
+- Explicit dates: "by Friday", "due January 20", "deadline is next Monday", "invited talk in 3 months"
+- Relative terms: "within 48 hours", "by end of week", "ASAP", "urgent"
+- Meeting requests: "meeting at 2pm tomorrow", "scheduled for Wednesday"
+
+## Calendar Event Detection
+Detect if the email contains information about calendar events. Look for:
+1. **Meeting** - Phrases like "let's meet", "schedule a call", "meeting at", contains Zoom/Teams/Google Meet links
+2. **Deadline** - Contains "due by", "deadline", "submit before", "by end of", work must be completed BY this time
+3. **Appointment** - Contains "your appointment is", "scheduled for", external commitments (doctor visits, etc.)
+4. **Reminder** - Contains "don't forget", "reminder:", "heads-up", informational only (no time blocking needed)
+5. **Time Blocking** - Explicit commands to "block out calendar", "keep free", "reserve time". Treat as High Confidence.
+
 ## Output Requirements
 1. Summary: 2 sentences only. Maximize information density. Do not be conversational.
 2. Reasoning: Explain *why* the priority was chosen based on the rules above.
 3. Suggested Action: Start with a verb (e.g., "Draft reply to...", "Review pathology and call...").
-4. Estimated Minutes: Be realistic. A deep paper review = 45. A quick reply = 2.
+4. Estimated Minutes: Be realistic. A deep paper review = 45. A quick reply = 5. (Min floor is 5m).
+5. Deadline: Extract any deadline from the email. Include source text.
+6. Detected Events: Array of calendar events detected in the email content.
 
 Return ONLY valid JSON:
 {
@@ -71,12 +73,24 @@ Return ONLY valid JSON:
     "reasoning": "string",
     "suggested_action": "string",
     "estimated_minutes": integer,
-    "detected_events": [],
-    "inferred_deadline": null,
-    "deadline_confidence": 0.0,
-    "deadline_source": null
+    "detected_events": [
+        {
+            "event_type": "meeting|deadline|appointment|reminder",
+            "title": "Generated title based on email content",
+            "proposed_start": "ISO8601 datetime or null",
+            "proposed_end": "ISO8601 datetime or null (calculated from start + duration)",
+            "duration_minutes": 45,
+            "location": "string or null (room, address, or video link)",
+            "attendees": ["name or email"],
+            "confidence": 0.0-1.0,
+            "source_text": "exact quote from email that triggered this detection"
+        }
+    ],
+    "inferred_deadline": "ISO8601 datetime or null",
+    "deadline_confidence": 0.0-1.0,
+    "deadline_source": "exact quote from email that indicates deadline, or null"
 }`
-}
+
 
 export async function analyzeTaskContent(content: string): Promise<AIAssessment | null> {
     try {
@@ -91,8 +105,6 @@ export async function analyzeTaskContent(content: string): Promise<AIAssessment 
             timeStyle: 'long'
         })
 
-        const systemPrompt = getSystemPrompt()
-
         const prompt = `Current date and time (Melbourne): ${melbourneTime}
 
 Analyze the following task/note from the user and classify it according to my priority framework.
@@ -106,7 +118,7 @@ Respond with ONLY valid JSON matching the schema described. Include detected_eve
 
         const result = await model.generateContent({
             contents: [
-                { role: 'user', parts: [{ text: systemPrompt }] },
+                { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
                 { role: 'model', parts: [{ text: 'Understood. I will analyze tasks and return valid JSON with domain, priority, summary, reasoning, suggested_action, estimated_minutes, detected_events, inferred_deadline, deadline_confidence, and deadline_source.' }] },
                 { role: 'user', parts: [{ text: prompt }] }
             ],

@@ -9,10 +9,7 @@ import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import type { DetectedEventRow, CognitoEventRow } from '@/lib/types/database'
 import { getConflicts, undoBump as undoBumpService } from '@/lib/services/calendar-intelligence'
-import { google } from 'googleapis'
-import { OAuth2Client } from 'google-auth-library'
-import * as fs from 'fs'
-import * as path from 'path'
+import { getCalendarClient } from '@/lib/services/google-auth'
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,69 +17,11 @@ const supabase = createClient(
 )
 
 const TIMEZONE = 'Australia/Melbourne'
-const CREDENTIALS_PATH = path.join(process.cwd(), '..', 'credentials.json')
-const TOKEN_PATH = path.join(process.cwd(), '..', 'token.json')
 
 interface ActionResult {
     success: boolean
     error?: string
     data?: unknown
-}
-
-interface CalendarCredentials {
-    installed?: {
-        client_id: string
-        client_secret: string
-        redirect_uris: string[]
-    }
-    web?: {
-        client_id: string
-        client_secret: string
-    }
-}
-
-interface TokenData {
-    token: string
-    refresh_token: string
-    token_uri: string
-    client_id: string
-    client_secret: string
-    scopes: string[]
-    expiry?: string
-}
-
-async function getCalendarClient() {
-    try {
-        if (!fs.existsSync(CREDENTIALS_PATH) || !fs.existsSync(TOKEN_PATH)) {
-            return null
-        }
-
-        const credentialsContent = fs.readFileSync(CREDENTIALS_PATH, 'utf-8')
-        const credentials: CalendarCredentials = JSON.parse(credentialsContent)
-        const clientConfig = credentials.installed || credentials.web
-
-        if (!clientConfig) return null
-
-        const tokenContent = fs.readFileSync(TOKEN_PATH, 'utf-8')
-        const tokenData: TokenData = JSON.parse(tokenContent)
-
-        const auth = new OAuth2Client(
-            clientConfig.client_id,
-            clientConfig.client_secret,
-            credentials.installed?.redirect_uris?.[0]
-        )
-
-        auth.setCredentials({
-            access_token: tokenData.token,
-            refresh_token: tokenData.refresh_token,
-            expiry_date: tokenData.expiry ? new Date(tokenData.expiry).getTime() : undefined
-        })
-
-        return google.calendar({ version: 'v3', auth })
-    } catch (e) {
-        console.error('Failed to initialize calendar client:', e)
-        return null
-    }
 }
 
 /**
