@@ -245,17 +245,22 @@ export async function findSlotWithBumping(
         }
 
         // Try each window
+        // CRITICAL: Preserve the loop date separately from 'current' which may be modified by conflict skipping
+        const loopDate = new Date(current)
+        loopDate.setHours(0, 0, 0, 0) // Normalize to start of day
+
         for (const window of windows) {
             const [startHour, startMin] = window.start_time.split(':').map(Number)
             const [endHour, endMin] = window.end_time.split(':').map(Number)
 
-            const windowStart = new Date(current)
+            // Use loopDate for window boundaries to preserve correct date
+            const windowStart = new Date(loopDate)
             windowStart.setHours(startHour, startMin, 0, 0)
 
-            const windowEnd = new Date(current)
+            const windowEnd = new Date(loopDate)
             windowEnd.setHours(endHour, endMin, 0, 0)
 
-            console.log(`  Checking window: ${window.name} (${windowStart.toTimeString().slice(0, 8)}-${windowEnd.toTimeString().slice(0, 8)})`)
+            console.log(`  Checking window: ${window.name} (${windowStart.toISOString()} - ${windowEnd.toISOString()})`)
 
             // Skip if current time is past this window
             if (current > windowEnd) {
@@ -263,11 +268,11 @@ export async function findSlotWithBumping(
                 continue
             }
 
-            // Adjust current to window start if before it
+            // Adjust slot start to whichever is later: current time or window start
             let slotStart = new Date(Math.max(current.getTime(), windowStart.getTime()))
             const slotEnd = new Date(slotStart.getTime() + durationMs)
 
-            console.log(`    Proposed slot: ${slotStart.toTimeString().slice(0, 8)}-${slotEnd.toTimeString().slice(0, 8)}`)
+            console.log(`    Proposed slot: ${slotStart.toISOString()} - ${slotEnd.toISOString()}`)
 
             // Check if slot fits in window
             if (slotEnd > windowEnd) {
@@ -278,7 +283,7 @@ export async function findSlotWithBumping(
             // Check for conflicts
             const conflicts = await getConflicts(slotStart, slotEnd)
             console.log(`    Conflicts found: ${conflicts.length}`)
-            conflicts.forEach(c => console.log(`      - ${c.summary} (${c.isProtected ? 'PROTECTED' : 'bumpable'})`))
+            conflicts.forEach(c => console.log(`      - ${c.summary} (${c.isProtected ? 'PROTECTED' : 'non-protected'})`))
 
             // Filter out protected events
             const nonProtectedConflicts = conflicts.filter(c => !c.isProtected)
@@ -292,28 +297,40 @@ export async function findSlotWithBumping(
                 }
             }
 
-            if (nonProtectedConflicts.length > 0) {
-                // Check if these are bumpable Cognito events
-                const bumpableEvents = await getBumpableEvents(slotStart, slotEnd, priority)
+            // Get Cognito-managed events that can be bumped
+            const bumpableEvents = await getBumpableEvents(slotStart, slotEnd, priority)
+            console.log(`    Bumpable Cognito events: ${bumpableEvents.length}`)
 
-                if (bumpableEvents.length > 0 && bumpableEvents.length === nonProtectedConflicts.length) {
-                    // Can bump these events
-                    const cascadeWarning = bumpableEvents.length > 1
-                        ? `This will bump ${bumpableEvents.length} existing tasks`
+            // For CRITICAL tasks: schedule anyway, bump what we can
+            // Personal calendar conflicts are ignored - Critical tasks take precedence
+            if (isCritical) {
+                console.log(`    CRITICAL TASK: Force-scheduling despite conflicts`)
+                return {
+                    slot: { start: slotStart, end: slotEnd },
+                    requiresBumping: bumpableEvents.length > 0,
+                    eventsToBump: bumpableEvents.length > 0 ? bumpableEvents : undefined,
+                    cascadeWarning: bumpableEvents.length > 0
+                        ? `Will bump ${bumpableEvents.length} existing tasks`
                         : undefined
-
-                    return {
-                        slot: { start: slotStart, end: slotEnd },
-                        requiresBumping: true,
-                        eventsToBump: bumpableEvents,
-                        cascadeWarning
-                    }
                 }
             }
 
-            // Move to end of conflict and try again
-            const latestConflictEnd = Math.max(...conflicts.map(c => c.end.getTime()))
-            current = new Date(latestConflictEnd)
+            // For non-Critical tasks: only proceed if ALL conflicts are bumpable
+            if (bumpableEvents.length > 0 && bumpableEvents.length === nonProtectedConflicts.length) {
+                const cascadeWarning = bumpableEvents.length > 1
+                    ? `This will bump ${bumpableEvents.length} existing tasks`
+                    : undefined
+
+                return {
+                    slot: { start: slotStart, end: slotEnd },
+                    requiresBumping: true,
+                    eventsToBump: bumpableEvents,
+                    cascadeWarning
+                }
+            }
+
+            // Conflict exists but can't bump - just move to next window
+            console.log(`    Cannot use this slot, trying next window`)
         }
 
         // Move to next day
@@ -498,6 +515,12 @@ export async function scheduleTaskIntelligent(
     priority?: Priority,
     deadline?: Date
 ): Promise<{ eventId: string; eventUrl: string; scheduledStart: Date; scheduledEnd: Date } | null> {
+    console.log('=== scheduleTaskIntelligent CALLED ===')
+    console.log('TaskId:', taskId)
+    console.log('Subject:', subject)
+    console.log('Priority:', priority)
+    console.log('Deadline:', deadline?.toISOString() || 'none')
+
     const calendar = await getCalendarClient()
     if (!calendar) {
         console.log('Calendar client not available')
@@ -552,6 +575,10 @@ export async function scheduleTaskIntelligent(
     fullDescription += '\n\n---\n*Scheduled by Cognito AI Executive Assistant*'
 
     try {
+        console.log('=== CREATING CALENDAR EVENT ===')
+        console.log('Slot start:', slotResult.slot.start.toISOString())
+        console.log('Slot end:', slotResult.slot.end.toISOString())
+
         const eventRes = await calendar.events.insert({
             calendarId: 'primary',
             requestBody: {

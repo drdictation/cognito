@@ -265,8 +265,12 @@ export interface ExecuteResult {
 }
 
 export async function executeTask(taskId: string): Promise<ExecuteResult> {
+    console.log('=== executeTask CALLED ===')
+    console.log('TaskId:', taskId)
+
     // Validate Trello config
     if (!TRELLO_API_KEY || !TRELLO_TOKEN) {
+        console.log('ERROR: Trello not configured')
         return { success: false, error: 'Trello not configured' }
     }
 
