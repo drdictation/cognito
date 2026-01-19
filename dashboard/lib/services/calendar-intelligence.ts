@@ -71,6 +71,7 @@ async function getSchedulingWindows(
         .select('*')
         .eq('day_of_week', dayOfWeek)
         .eq('is_active', true)
+        .order('start_time', { ascending: true })  // CRITICAL: Sort by time!
 
     if (error || !data) {
         console.error('Failed to fetch scheduling windows:', error)
@@ -78,11 +79,14 @@ async function getSchedulingWindows(
     }
 
     // Filter by priority level
-    return data.filter((window: any) => {
+    const filtered = data.filter((window: any) => {
         if (window.priority_level === 'all') return true
         if (window.priority_level === 'critical_only') return isCritical
         return false
     })
+
+    console.log(`  Windows for day ${dayOfWeek}: ${filtered.map((w: any) => w.name + ' (' + w.start_time + ')').join(', ')}`)
+    return filtered
 }
 
 /**
@@ -216,6 +220,12 @@ export async function findSlotWithBumping(
     const now = new Date()
     const searchEnd = new Date(Math.min(deadline.getTime(), now.getTime() + (14 * 24 * 60 * 60 * 1000)))
 
+    console.log('=== findSlotWithBumping DEBUG ===')
+    console.log('Now:', now.toISOString(), '| Local:', now.toString())
+    console.log('Duration:', durationMinutes, 'min | Priority:', priority, '| isCritical:', isCritical)
+    console.log('Deadline:', deadline.toISOString())
+    console.log('Search window: now to', searchEnd.toISOString())
+
     let current = new Date(now)
     current.setMinutes(Math.ceil(current.getMinutes() / 30) * 30, 0, 0)
 
@@ -224,6 +234,8 @@ export async function findSlotWithBumping(
     while (current < searchEnd) {
         const dayOfWeek = current.getDay()
         const windows = await getSchedulingWindows(dayOfWeek, isCritical)
+
+        console.log(`Day ${dayOfWeek} (${current.toDateString()}): ${windows.length} windows available`)
 
         if (windows.length === 0) {
             // No windows for this day, skip to next day
@@ -243,24 +255,37 @@ export async function findSlotWithBumping(
             const windowEnd = new Date(current)
             windowEnd.setHours(endHour, endMin, 0, 0)
 
+            console.log(`  Checking window: ${window.name} (${windowStart.toTimeString().slice(0, 8)}-${windowEnd.toTimeString().slice(0, 8)})`)
+
             // Skip if current time is past this window
-            if (current > windowEnd) continue
+            if (current > windowEnd) {
+                console.log(`    SKIP: current time past window end`)
+                continue
+            }
 
             // Adjust current to window start if before it
             let slotStart = new Date(Math.max(current.getTime(), windowStart.getTime()))
             const slotEnd = new Date(slotStart.getTime() + durationMs)
 
+            console.log(`    Proposed slot: ${slotStart.toTimeString().slice(0, 8)}-${slotEnd.toTimeString().slice(0, 8)}`)
+
             // Check if slot fits in window
-            if (slotEnd > windowEnd) continue
+            if (slotEnd > windowEnd) {
+                console.log(`    SKIP: slot end exceeds window end`)
+                continue
+            }
 
             // Check for conflicts
             const conflicts = await getConflicts(slotStart, slotEnd)
+            console.log(`    Conflicts found: ${conflicts.length}`)
+            conflicts.forEach(c => console.log(`      - ${c.summary} (${c.isProtected ? 'PROTECTED' : 'bumpable'})`))
 
             // Filter out protected events
             const nonProtectedConflicts = conflicts.filter(c => !c.isProtected)
 
             if (conflicts.length === 0) {
                 // Perfect! No conflicts
+                console.log(`    SUCCESS: No conflicts, using this slot!`)
                 return {
                     slot: { start: slotStart, end: slotEnd },
                     requiresBumping: false
