@@ -36,6 +36,28 @@ export async function getPendingTasks(): Promise<TasksResponse> {
     return { tasks: sortedTasks as InboxTask[] }
 }
 
+export async function updateTaskDeadline(taskId: string, deadline: string) {
+    const supabase = createAdminClient()
+
+    try {
+        const { error } = await (supabase
+            .from('inbox_queue') as any)
+            .update({
+                user_deadline: deadline,
+                deadline_source: 'user_override'
+            })
+            .eq('id', taskId)
+
+        if (error) throw error
+
+        revalidatePath('/')
+        return { success: true }
+    } catch (error) {
+        console.error('Failed to update deadline:', error)
+        return { success: false, error: 'Failed to update deadline' }
+    }
+}
+
 export async function updateTaskStatus(
     taskId: string,
     status: TaskStatus,

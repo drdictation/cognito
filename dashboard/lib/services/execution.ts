@@ -319,7 +319,8 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
             typedTask.ai_estimated_minutes || 30,
             cardResult.cardUrl,
             typedTask.ai_priority || 'Normal',
-            typedTask.deadline ? new Date(typedTask.deadline) : undefined
+            typedTask.user_deadline ? new Date(typedTask.user_deadline) :
+                typedTask.deadline ? new Date(typedTask.deadline) : undefined
         )
         if (calendarResult) {
             console.log(`Calendar event created: ${calendarResult.eventUrl}`)

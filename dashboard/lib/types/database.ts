@@ -64,7 +64,9 @@ export interface InboxTask {
     ai_deadline_source: string | null
     // Phase 7b: Deadline (consolidated)
     deadline: string | null
-    deadline_source: 'extracted' | 'default' | null
+    deadline_source: 'extracted' | 'default' | 'user_override' | null
+    // Phase 9a: Explicit Deadlines
+    user_deadline: string | null
     // Phase 3a/3c: Execution tracking
     execution_status: 'pending' | 'scheduled' | 'completed' | 'failed' | null
     trello_card_id: string | null

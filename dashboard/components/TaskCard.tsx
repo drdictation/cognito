@@ -23,6 +23,9 @@ import {
 import { toast } from 'sonner'
 import { DraftEditor } from './DraftEditor'
 import { CalendarEventCard } from './CalendarEventCard'
+import { DeadlinePicker } from './DeadlinePicker'
+
+
 
 interface TaskCardProps {
     task: InboxTask
@@ -60,6 +63,10 @@ export function TaskCard({ task, index }: TaskCardProps) {
     )
     const [tweakUpdates, setTweakUpdates] = useState<{ priority?: Priority; domain?: Domain; estimatedMinutes?: number }>({})
     const [detectedEvents, setDetectedEvents] = useState<DetectedEventRow[]>([])
+    const [isDeadlinePickerOpen, setIsDeadlinePickerOpen] = useState(false)
+    const [deadline, setDeadline] = useState<string | null>(task.user_deadline || task.deadline || task.ai_assessment?.inferred_deadline || null)
+
+
 
     const priority = task.ai_priority || 'Normal'
     const domain = task.ai_domain || 'Admin'
@@ -175,13 +182,14 @@ export function TaskCard({ task, index }: TaskCardProps) {
                                     {task.ai_estimated_minutes}m
                                 </span>
                             )}
-                            {task.deadline && (
+                            {(task.user_deadline || task.deadline) && (
                                 <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-orange-500/10 text-orange-600 border border-orange-500/20 flex items-center gap-1">
                                     <CalendarIcon size={12} />
-                                    {new Date(task.deadline).toLocaleDateString('en-AU', {
+                                    {new Date(task.user_deadline || task.deadline!).toLocaleDateString('en-AU', {
                                         month: 'short',
                                         day: 'numeric'
                                     })}
+                                    {task.user_deadline && " (User)"}
                                 </span>
                             )}
                             {detectedEvents.length > 0 && (
@@ -249,6 +257,46 @@ export function TaskCard({ task, index }: TaskCardProps) {
                             </div>
                         )}
 
+                        {/* Deadline Control */}
+                        <div className="flex flex-wrap items-center gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100/50">
+                            <div className="flex items-center gap-2 text-sm text-gray-700">
+                                <CalendarIcon className="w-4 h-4 text-blue-600" />
+                                <span className="font-medium">Deadline:</span>
+                                {deadline ? (
+                                    <span className={task.user_deadline ? "text-emerald-700 font-medium" : "text-gray-600"}>
+                                        {new Date(deadline).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                        {task.user_deadline && " (User Set)"}
+                                    </span>
+                                ) : (
+                                    <span className="text-gray-400 italic">None set</span>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setIsDeadlinePickerOpen(true)}
+                                className="text-xs bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 px-2 py-1 rounded shadow-sm transition-colors"
+                            >
+                                Edit
+                            </button>
+                        </div>
+
+                        {isDeadlinePickerOpen && (
+                            <div className="mb-4">
+                                <DeadlinePicker
+                                    initialDate={deadline ? new Date(deadline) : undefined}
+                                    onSave={async (date) => {
+                                        setIsDeadlinePickerOpen(false)
+                                        // Optimistic update
+                                        setDeadline(date.toISOString())
+                                        // Server action
+                                        const { updateTaskDeadline } = await import('@/lib/actions/tasks')
+                                        await updateTaskDeadline(task.id, date.toISOString())
+                                        toast.success('Deadline updated')
+                                    }}
+                                    onCancel={() => setIsDeadlinePickerOpen(false)}
+                                />
+                            </div>
+                        )}
+
                         {/* Detected Calendar Events */}
                         {detectedEvents.length > 0 && (
                             <div>
@@ -300,10 +348,10 @@ export function TaskCard({ task, index }: TaskCardProps) {
                                                     key={p}
                                                     onClick={() => setTweakUpdates(prev => ({ ...prev, priority: p }))}
                                                     className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-150 active:scale-95 ${isSelected
-                                                            ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/30 shadow-md'
-                                                            : isCurrentValue
-                                                                ? 'bg-primary/10 border-primary/50 text-primary'
-                                                                : 'bg-card border-border text-muted-foreground hover:bg-secondary/80 hover:border-primary/30'
+                                                        ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/30 shadow-md'
+                                                        : isCurrentValue
+                                                            ? 'bg-primary/10 border-primary/50 text-primary'
+                                                            : 'bg-card border-border text-muted-foreground hover:bg-secondary/80 hover:border-primary/30'
                                                         }`}
                                                 >
                                                     {isSelected && <Check size={12} className="inline mr-1" />}
@@ -325,10 +373,10 @@ export function TaskCard({ task, index }: TaskCardProps) {
                                                     key={d}
                                                     onClick={() => setTweakUpdates(prev => ({ ...prev, domain: d }))}
                                                     className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-150 active:scale-95 ${isSelected
-                                                            ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/30 shadow-md'
-                                                            : isCurrentValue
-                                                                ? 'bg-primary/10 border-primary/50 text-primary'
-                                                                : 'bg-card border-border text-muted-foreground hover:bg-secondary/80 hover:border-primary/30'
+                                                        ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/30 shadow-md'
+                                                        : isCurrentValue
+                                                            ? 'bg-primary/10 border-primary/50 text-primary'
+                                                            : 'bg-card border-border text-muted-foreground hover:bg-secondary/80 hover:border-primary/30'
                                                         }`}
                                                 >
                                                     {isSelected && <Check size={12} className="inline mr-1" />}
@@ -380,10 +428,10 @@ export function TaskCard({ task, index }: TaskCardProps) {
                                                         key={mins}
                                                         onClick={() => setTweakUpdates(prev => ({ ...prev, estimatedMinutes: mins }))}
                                                         className={`px-2 py-1 rounded text-xs font-medium border transition-all duration-150 active:scale-95 ${isSelected
-                                                                ? 'bg-primary border-primary text-primary-foreground shadow-sm'
-                                                                : isCurrentValue
-                                                                    ? 'bg-primary/10 border-primary/50 text-primary'
-                                                                    : 'bg-card border-border text-muted-foreground hover:bg-secondary/80'
+                                                            ? 'bg-primary border-primary text-primary-foreground shadow-sm'
+                                                            : isCurrentValue
+                                                                ? 'bg-primary/10 border-primary/50 text-primary'
+                                                                : 'bg-card border-border text-muted-foreground hover:bg-secondary/80'
                                                             }`}
                                                     >
                                                         {mins}m
