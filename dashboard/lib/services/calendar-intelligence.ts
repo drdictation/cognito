@@ -310,10 +310,18 @@ export async function findSlotWithBumping(
             const bumpableEvents = await getBumpableEvents(slotStart, slotEnd, priority)
             console.log(`    Bumpable Cognito events: ${bumpableEvents.length}`)
 
-            // Check if any conflict is also a Critical Cognito event (can't double-book Critical)
-            const hasCriticalConflict = conflicts.some(c =>
-                c.summary.includes('[Clinical]') || c.summary.includes('[Critical]')
-            )
+            // Check if any conflict is a Critical Cognito event in the database
+            // (We can't bump Critical with Critical, so must find another slot)
+            const { data: criticalConflicts } = await (supabase
+                .from('cognito_events') as any)
+                .select('id, priority')
+                .eq('is_active', true)
+                .eq('priority', 'Critical')
+                .gte('scheduled_end', slotStart.toISOString())
+                .lte('scheduled_start', slotEnd.toISOString())
+
+            const hasCriticalConflict = (criticalConflicts?.length || 0) > 0
+            console.log(`    Critical Cognito conflicts: ${criticalConflicts?.length || 0}`)
 
             // For CRITICAL tasks: schedule anyway IF no other Critical events in this slot
             if (isCritical && !hasCriticalConflict) {
