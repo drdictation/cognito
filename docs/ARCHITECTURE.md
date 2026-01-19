@@ -1,4 +1,4 @@
-# Cognito Architecture - Complete System (Phases 1-8)
+# Cognito Architecture - Complete System (Phases 1-9)
 
 ## System Overview
 
@@ -118,13 +118,25 @@ When a user clicks **"Approve"**, the system orchestrates multiple APIs API call
     *   **Context Injection:** Appends the full original email content + AI summary + Draft text to the card description.
     *   **deadline mapping:** Maps AI-inferred deadline to Trello due date.
 
-2.  **Calendar Time Blocking:**
+2.  **Calendar Time Blocking (Intelligent Scheduler - Phase 9a):**
     * **Duration Estimation:** Uses AI's `estimated_minutes` (Min: 5m, Max: 120m).
-    * **Slot Finder:** Scans Google Calendar for available slots within `scheduling_windows`.
-    * **Priority Bumping:** For Critical tasks, the system can "bump" existing Cognito-managed Focus Time blocks to future slots within their respective deadlines.
+    * **Database-Driven Windows:** Scheduling windows stored in `scheduling_windows` table, queried by day and priority.
+    * **Intelligent Slot Finding:** 
+        - Searches for available slots within scheduling windows
+        - Sorted by time (morning before evening)
+        - Respects deadline constraints
+    * **Conflict Detection:**
+        - All-day events from non-protected calendars are IGNORED
+        - Timed events from non-protected calendars are RESPECTED as conflicts
+        - Protected calendar (ICLOUD) events are never scheduled over
+    * **Priority Bumping Logic:**
+        - Critical tasks can bump High/Normal/Low priority Cognito events
+        - Critical tasks CANNOT bump other Critical tasks (finds next available slot)
+        - Bumped events use 2-week extended deadline to find new slots
+        - Non-Critical tasks require ALL conflicts to be bumpable
     * **Booking:** Creates a private "Focus Time" event with extended properties tracking `task_id`, `priority`, and `deadline`.
-    * **Event Approval:** AI-detected events are presented in a dedicated "Pending Schedule Items" list at the top of the dashboard. This allows for approval/edit/rejection even after the main task has been moved to Trello.
-    * **Conflict Management:** Users can "Force Approve" (Create Anyway) events if they choose to overlap with existing appointments.
+    * **Event Approval:** AI-detected events are presented in a dedicated "Pending Schedule Items" list at the top of the dashboard.
+    * **Multi-Session Chunking (Phase 9b):** AI detects tasks requiring multiple sessions and suggests optimal breakdown with configurable parameters.
 
 
 ---
@@ -169,6 +181,30 @@ Tracks events created by Cognito for bumping purposes.
 | `priority` | TEXT | Priority for bumping logic. |
 | `deadline` | TIMESTAMP | Latest point this task can be completed. |
 | `bump_count` | INT | Number of times this task was moved. |
+
+### `scheduling_windows` Table (Phase 9a)
+Database-driven scheduling windows for intelligent slot finding.
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `day_of_week` | INT | 0=Sunday, 1=Monday, ..., 6=Saturday. |
+| `start_time` | TIME | Window start (e.g., "09:00:00"). |
+| `end_time` | TIME | Window end (e.g., "12:00:00"). |
+| `priority_level` | TEXT | 'all' or 'critical_only'. |
+| `is_active` | BOOL | Whether this window is enabled. |
+| `name` | TEXT | Human-readable name. |
+
+### `task_sessions` Table (Phase 9b)
+Tracks individual sessions for multi-session tasks.
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `task_id` | UUID | Reference to parent task in inbox_queue. |
+| `session_number` | INT | Session sequence (1, 2, 3...). |
+| `duration_minutes` | INT | Duration of this session. |
+| `status` | TEXT | pending, scheduled, completed. |
+| `scheduled_start` | TIMESTAMP | When this session is scheduled. |
+| `calendar_event_id` | TEXT | Google Calendar event ID for this session. |
 
 
 ---

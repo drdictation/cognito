@@ -85,9 +85,45 @@
 - [x] **Successful Build:** Verified local and production builds with full feature parity.
 
 
-## 🔵 Phase 9: Expansion [Future]
+## 🟢 Phase 9a: Explicit Deadlines & Intelligent Scheduling [Completed]
+- [x] **User-Defined Deadlines:**
+  - [x] Added `user_deadline` column to `inbox_queue` table.
+  - [x] Deadline editor UI in TaskCard with date/time picker.
+  - [x] AI inference of deadlines from email content (e.g., "due today", "by Friday").
+  - [x] Deadline source tracking (`ai`, `user_override`, `default`).
+- [x] **Database-Driven Scheduling Windows:**
+  - [x] Created `scheduling_windows` table with day, time, priority level.
+  - [x] Morning windows (9am-12pm), evening windows (8pm-9:30pm), critical overflow (7:30pm-8pm, 9:30pm-10pm).
+  - [x] Dynamic window queries by day of week and priority level.
+- [x] **Intelligent Bumping Logic:**
+  - [x] Critical tasks can bump High/Normal/Low priority events.
+  - [x] Critical tasks cannot bump other Critical tasks (finds next available slot).
+  - [x] Bumped events use 2-week extended deadline to find new slots.
+  - [x] Non-Critical tasks require ALL conflicts to be bumpable.
+- [x] **Conflict Handling:**
+  - [x] All-day events from non-protected calendars are ignored.
+  - [x] Timed events from non-protected calendars are respected as conflicts.
+  - [x] Protected calendar (ICLOUD) events are never scheduled over.
+  - [x] Strict overlap detection (edge-case fix for adjacent events).
+- [x] **Comprehensive Documentation:** Created `docs/CALENDAR_SCHEDULING.md` with full algorithm details.
+
+## 🟢 Phase 9b: Multi-Session Task Chunking [Completed]
+- [x] **AI Detection:** Enhanced LLM prompt to detect tasks requiring multiple sessions.
+- [x] **Chunking Suggestions:**
+  - [x] AI suggests session count, duration, and cadence (daily/weekly).
+  - [x] JSON schema includes `multi_session` object with parameters.
+- [x] **Session Management:**
+  - [x] Created `task_sessions` table to track individual sessions.
+  - [x] Server actions for creating, updating, and scheduling sessions.
+- [x] **UI Integration:**
+  - [x] `SessionsSuggestion` component for reviewing AI recommendations.
+  - [x] Configurable parameters (session count, duration, cadence).
+  - [x] Accept/reject workflow integrated into TaskCard.
+
+## 🔵 Phase 10: Future Expansion
 - [ ] **Mobile App:** React Native wrapper for on-the-go triage.
 - [ ] **Math Alert:** Conflict detection logic.
+- [ ] **Recurring Task Templates:** AI learns from repeated patterns.
 
 
 ---

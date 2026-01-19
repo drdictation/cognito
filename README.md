@@ -35,7 +35,7 @@ The TypeScript service parses forwarded email headers to identify the **original
 
 ---
 
-## 🚀 Phase 1-8: Complete System (Current)
+## 🚀 Phase 1-9: Complete System (Current)
 
 ### Features
 
@@ -47,11 +47,14 @@ The TypeScript service parses forwarded email headers to identify the **original
 - **Manual Task Analysis:** Real-time classification of hand-written or dictated notes.
 - **Smart Calendar Detection:** AI extracts calendar events (meetings, deadlines, appointments) directly from email content.
 - **Dynamic Deadline Inference:** Priority-based deadline assignments with task-specific logic (e.g., "invited talks").
+- **Multi-Session Detection:** AI identifies tasks requiring multiple sessions and suggests optimal chunking parameters.
 
 #### 🖥️ Dashboard (Next.js)
 - **Daily Briefing:** Approve/Reject/Snooze/Tweak tasks.
 - **Draft Editor:** Review, edit, and regenerate AI drafts.
 - **Calendar Event Cards:** AI-detected event suggestions with conflict warnings and one-click approval.
+- **Deadline Editor:** Set explicit deadlines with date/time picker or let AI infer from content.
+- **Session Chunking UI:** Review and configure multi-session task breakdowns.
 - **"Reply Now":** One-click opening of local email client.
 - **Manual Add:** Floating action button for quick text/voice ingestion.
 - **Knowledge Base:** Editable domain-specific "cheat sheets" to train the AI's judgment and tone.
@@ -65,10 +68,13 @@ The TypeScript service parses forwarded email headers to identify the **original
 #### ⚡ Execution Engine
 - **Trello Integration:** Approved tasks automatically create Trello cards with rich context (Summary, Suggestions, and full email content via recursive MIME extraction).
 - **Trello Guardrails:** Built-in protection against API limits with automatic 16,384-character description truncation.
-- **Calendar Integration:** "Time Blocking" - AI estimates duration and finds free slots in Google Calendar.
-- **Intelligent Scheduling:** Dynamic slots (8pm-9:30pm Sun-Thu, 9am-12pm Tue) and Critical task overflow windows.
-- **Smart Bumping:** Critical tasks automatically push lower-priority "Focus Time" blocks to the next available slot.
-- **Protected Events:** Events on "ICLOUD" calendars are automatically shielded from being bumped.
+- **Intelligent Calendar Scheduling:**
+    - **Database-Driven Windows:** Flexible scheduling windows stored in Supabase (morning, evening, critical overflow).
+    - **Smart Conflict Detection:** All-day family events ignored; timed events respected.
+    - **Priority Bumping:** Critical tasks can bump High/Normal/Low events; Critical tasks never double-book.
+    - **Extended Deadline for Bumped Events:** Bumped tasks use 2-week window to find new slots.
+    - **Protected Events:** Events on "ICLOUD" calendars are automatically shielded from being bumped.
+- **Multi-Session Scheduling:** Individual sessions tracked and scheduled separately with configurable cadence.
 
 #### 🛡️ Ingestion Pipeline
 - **Central Hub:** Aggregates 6 email sources.

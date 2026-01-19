@@ -87,6 +87,18 @@
     * **Cloud Auth:** Transition to environment-variable-based Google OAuth (no filesystem dependencies).
     * **Centralized API:** Unified Google Auth and Gmail services for consistent cross-app access.
     * **Embedded Intelligence:** System prompt embedded in service code to eliminate file-read overhead.
+* **Explicit Deadlines & Intelligent Scheduling (Phase 9a) [Completed]**
+    * **User-Defined Deadlines:** Tasks can have explicit deadlines set by user or inferred by AI from email content.
+    * **Database-Driven Scheduling Windows:** Flexible scheduling windows stored in Supabase, queryable by day and priority.
+    * **Intelligent Bumping Logic:** Critical tasks can bump lower-priority events; bumped events automatically find new slots.
+    * **All-Day Event Handling:** Family calendar all-day events are ignored; timed events are respected as conflicts.
+    * **Critical Conflict Prevention:** System prevents double-booking of Critical tasks by checking existing Critical events.
+    * **Extended Deadline for Bumped Events:** Bumped events use 2-week extended deadline to ensure they find new slots.
+* **Multi-Session Task Chunking (Phase 9b) [Completed]**
+    * **AI-Driven Chunking:** AI detects tasks requiring multiple sessions and suggests optimal breakdown.
+    * **Configurable Parameters:** User can adjust session count, duration, and cadence (daily/weekly).
+    * **Session Management:** Individual sessions tracked in database with status and scheduling.
+    * **Integrated UI:** SessionsSuggestion component in TaskCard for reviewing and accepting chunking recommendations.
 
 
 ## 4. Success Metrics
