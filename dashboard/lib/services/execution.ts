@@ -299,7 +299,7 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
         return { success: false, error: 'Failed to create Trello card' }
     }
 
-    // Phase 3c: Create calendar time block
+    // Phase 3c: Create calendar time block using INTELLIGENT scheduler
     let calendarResult: {
         eventId: string
         eventUrl: string
@@ -308,9 +308,10 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
     } | null = null
 
     try {
-        const { scheduleTask } = await import('./calendar')
+        // Use intelligent scheduler with database-driven windows and bumping
+        const { scheduleTaskIntelligent } = await import('./calendar-intelligence')
         const typedTask = task as InboxTask
-        calendarResult = await scheduleTask(
+        calendarResult = await scheduleTaskIntelligent(
             taskId,
             typedTask.subject || 'Cognito Task',
             typedTask.ai_domain || 'Task',

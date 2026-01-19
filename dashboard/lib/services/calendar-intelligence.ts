@@ -457,3 +457,139 @@ export async function saveDetectedEvent(
 
     return data?.id || null
 }
+
+/**
+ * Intelligent task scheduling using database-driven windows and bumping
+ * This is the PRIMARY scheduler - replaces the hardcoded calendar.ts for all tasks
+ */
+export async function scheduleTaskIntelligent(
+    taskId: string,
+    subject: string,
+    domain: string,
+    summary: string,
+    suggestedAction: string,
+    estimatedMinutes: number,
+    trelloUrl?: string,
+    priority?: Priority,
+    deadline?: Date
+): Promise<{ eventId: string; eventUrl: string; scheduledStart: Date; scheduledEnd: Date } | null> {
+    const calendar = await getCalendarClient()
+    if (!calendar) {
+        console.log('Calendar client not available')
+        return null
+    }
+
+    const taskPriority = priority || 'Normal'
+    const isCritical = taskPriority === 'Critical'
+
+    // Use explicit deadline or calculate default
+    const taskDeadline = deadline || getDefaultDeadline(taskPriority)
+
+    // Use intelligent slot finding with bumping support
+    const slotResult = await findSlotWithBumping(
+        estimatedMinutes,
+        taskPriority,
+        taskDeadline,
+        isCritical
+    )
+
+    if (!slotResult.slot) {
+        console.log('No available slot found within deadline')
+        return null
+    }
+
+    // If bumping is required, perform the bumps first
+    if (slotResult.requiresBumping && slotResult.eventsToBump) {
+        console.log(`Bumping ${slotResult.eventsToBump.length} events for ${taskPriority} task`)
+        for (const eventToBump of slotResult.eventsToBump) {
+            // Find new slot for bumped event
+            const bumpedSlotResult = await findSlotWithBumping(
+                eventToBump.scheduled_end && eventToBump.scheduled_start
+                    ? Math.round((new Date(eventToBump.scheduled_end).getTime() - new Date(eventToBump.scheduled_start).getTime()) / 60000)
+                    : 30,
+                eventToBump.priority,
+                eventToBump.deadline ? new Date(eventToBump.deadline) : getDefaultDeadline(eventToBump.priority),
+                eventToBump.priority === 'Critical'
+            )
+
+            if (bumpedSlotResult.slot) {
+                await bumpEvent(eventToBump.id, bumpedSlotResult.slot, taskId)
+            }
+        }
+    }
+
+    // Build event description
+    const TIMEZONE = 'Australia/Melbourne'
+    let fullDescription = `**Summary:** ${summary}\n\n**Action:** ${suggestedAction}`
+    if (trelloUrl) {
+        fullDescription += `\n\n📋 Trello Card: ${trelloUrl}`
+    }
+    fullDescription += '\n\n---\n*Scheduled by Cognito AI Executive Assistant*'
+
+    try {
+        const eventRes = await calendar.events.insert({
+            calendarId: 'primary',
+            requestBody: {
+                summary: `[${domain}] ${subject.substring(0, 50)}`,
+                description: fullDescription,
+                start: {
+                    dateTime: slotResult.slot.start.toISOString(),
+                    timeZone: TIMEZONE
+                },
+                end: {
+                    dateTime: slotResult.slot.end.toISOString(),
+                    timeZone: TIMEZONE
+                },
+                visibility: 'private',
+                extendedProperties: {
+                    private: {
+                        cognito_managed: 'true',
+                        task_id: taskId,
+                        priority: taskPriority,
+                        deadline: taskDeadline.toISOString()
+                    }
+                },
+                reminders: {
+                    useDefault: false,
+                    overrides: [
+                        { method: 'popup', minutes: 10 }
+                    ]
+                }
+            }
+        })
+
+        const event = eventRes.data
+        console.log(`Created calendar event: ${subject} at ${slotResult.slot.start.toISOString()}`)
+
+        // Save to cognito_events table for bump tracking
+        try {
+            await (supabase
+                .from('cognito_events') as any)
+                .insert({
+                    task_id: taskId,
+                    google_event_id: event.id!,
+                    title: `[${domain}] ${subject.substring(0, 50)}`,
+                    scheduled_start: slotResult.slot.start.toISOString(),
+                    scheduled_end: slotResult.slot.end.toISOString(),
+                    priority: taskPriority,
+                    deadline: taskDeadline.toISOString(),
+                    original_start: slotResult.slot.start.toISOString(),
+                    original_end: slotResult.slot.end.toISOString(),
+                    is_active: true
+                })
+        } catch (e) {
+            console.error('Failed to save to cognito_events:', e)
+            // Don't fail the whole operation
+        }
+
+        return {
+            eventId: event.id!,
+            eventUrl: event.htmlLink!,
+            scheduledStart: slotResult.slot.start,
+            scheduledEnd: slotResult.slot.end
+        }
+    } catch (e) {
+        console.error('Failed to create calendar event:', e)
+        return null
+    }
+}
