@@ -312,16 +312,20 @@ export async function findSlotWithBumping(
 
             // Check if any conflict is a Critical Cognito event in the database
             // (We can't bump Critical with Critical, so must find another slot)
+            // Use strict overlap: event_start < slot_end AND event_end > slot_start
             const { data: criticalConflicts } = await (supabase
                 .from('cognito_events') as any)
-                .select('id, priority')
+                .select('id, priority, scheduled_start, scheduled_end')
                 .eq('is_active', true)
                 .eq('priority', 'Critical')
-                .gte('scheduled_end', slotStart.toISOString())
-                .lte('scheduled_start', slotEnd.toISOString())
+                .gt('scheduled_end', slotStart.toISOString())  // event ends AFTER slot starts
+                .lt('scheduled_start', slotEnd.toISOString())  // event starts BEFORE slot ends
 
             const hasCriticalConflict = (criticalConflicts?.length || 0) > 0
             console.log(`    Critical Cognito conflicts: ${criticalConflicts?.length || 0}`)
+            if (criticalConflicts?.length) {
+                criticalConflicts.forEach((c: any) => console.log(`      - ${c.scheduled_start} to ${c.scheduled_end}`))
+            }
 
             // For CRITICAL tasks: schedule anyway IF no other Critical events in this slot
             if (isCritical && !hasCriticalConflict) {
