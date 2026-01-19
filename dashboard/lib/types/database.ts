@@ -19,6 +19,13 @@ export interface DetectedEvent {
     source_text: string
 }
 
+export interface MultiSessionSuggestion {
+    suggested_sessions: number
+    session_duration_minutes: number
+    cadence_days: number
+    rationale: string
+}
+
 export interface AIAssessment {
     domain: 'Clinical' | 'Research' | 'Admin' | 'Home' | 'Hobby'
     priority: 'Critical' | 'High' | 'Normal' | 'Low'
@@ -31,6 +38,8 @@ export interface AIAssessment {
     inferred_deadline?: string | null
     deadline_confidence?: number
     deadline_source?: string | null
+    // Phase 9b: Multi-session chunking
+    multi_session?: MultiSessionSuggestion | null
 }
 
 export type TaskStatus = 'pending' | 'approved' | 'rejected' | 'snoozed'
@@ -183,6 +192,23 @@ export interface SchedulingWindow {
     description: string | null
 }
 
+export type SessionStatus = 'pending' | 'scheduled' | 'completed' | 'skipped'
+
+export interface TaskSession {
+    id: string
+    parent_task_id: string
+    session_number: number
+    title: string
+    duration_minutes: number
+    scheduled_start: string | null
+    scheduled_end: string | null
+    google_event_id: string | null
+    status: SessionStatus
+    notes: string | null
+    created_at: string
+    updated_at: string
+}
+
 export interface ProtectedCalendar {
     id: string
     calendar_name: string
@@ -237,6 +263,11 @@ export interface Database {
                 Row: SchedulingWindow
                 Insert: Omit<SchedulingWindow, 'id'>
                 Update: Partial<Omit<SchedulingWindow, 'id'>>
+            }
+            task_sessions: {
+                Row: TaskSession
+                Insert: Omit<TaskSession, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<TaskSession, 'id' | 'created_at'>>
             }
             protected_calendars: {
                 Row: ProtectedCalendar

@@ -24,8 +24,7 @@ import { toast } from 'sonner'
 import { DraftEditor } from './DraftEditor'
 import { CalendarEventCard } from './CalendarEventCard'
 import { DeadlinePicker } from './DeadlinePicker'
-
-
+import { SessionsSuggestion } from './SessionsSuggestion'
 
 interface TaskCardProps {
     task: InboxTask
@@ -65,7 +64,7 @@ export function TaskCard({ task, index }: TaskCardProps) {
     const [detectedEvents, setDetectedEvents] = useState<DetectedEventRow[]>([])
     const [isDeadlinePickerOpen, setIsDeadlinePickerOpen] = useState(false)
     const [deadline, setDeadline] = useState<string | null>(task.user_deadline || task.deadline || task.ai_assessment?.inferred_deadline || null)
-
+    const [showChunking, setShowChunking] = useState(!!task.ai_assessment?.multi_session)
 
 
     const priority = task.ai_priority || 'Normal'
@@ -255,6 +254,17 @@ export function TaskCard({ task, index }: TaskCardProps) {
                                     {task.ai_suggested_action}
                                 </p>
                             </div>
+                        )}
+
+                        {/* Multi-Session Chunking Suggestion */}
+                        {showChunking && task.ai_assessment?.multi_session && (
+                            <SessionsSuggestion
+                                suggestion={task.ai_assessment.multi_session}
+                                taskId={task.id}
+                                deadline={deadline ? new Date(deadline) : undefined}
+                                onAccept={() => setShowChunking(false)}
+                                onReject={() => setShowChunking(false)}
+                            />
                         )}
 
                         {/* Deadline Control */}

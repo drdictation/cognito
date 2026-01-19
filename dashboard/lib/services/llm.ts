@@ -64,6 +64,19 @@ Detect if the email contains information about calendar events. Look for:
 4. Estimated Minutes: Be realistic. A deep paper review = 45. A quick reply = 5. (Min floor is 5m).
 5. Deadline: Extract any deadline from the email. Include source text.
 6. Detected Events: Array of calendar events detected in the email content.
+7. Multi-Session Detection: If the task requires multiple focused work sessions, suggest chunking.
+
+## Multi-Session Task Detection
+Detect tasks that benefit from multiple work sessions spread over days:
+- **Keywords**: "prepare talk", "write manuscript", "grant application", "major revision", "develop presentation", "create course"
+- **High Effort**: Total estimated time > 2 hours (120 minutes)
+- **Deep Work**: Tasks requiring sustained concentration (research, writing, preparation)
+
+For multi-session tasks, suggest:
+- Number of sessions (typically 3-5)
+- Duration per session (60-120 minutes, based on task complexity)
+- Cadence (days between sessions: 2-4 days for talks, 1-2 days for urgent work)
+- Rationale explaining why chunking helps
 
 Return ONLY valid JSON:
 {
@@ -88,7 +101,13 @@ Return ONLY valid JSON:
     ],
     "inferred_deadline": "ISO8601 datetime or null",
     "deadline_confidence": 0.0-1.0,
-    "deadline_source": "exact quote from email that indicates deadline, or null"
+    "deadline_source": "exact quote from email that indicates deadline, or null",
+    "multi_session": {
+        "suggested_sessions": 4,
+        "session_duration_minutes": 90,
+        "cadence_days": 3,
+        "rationale": "Talk preparation typically requires multiple focused sessions for research, outline, slides, and rehearsal"
+    } OR null
 }`
 
 
