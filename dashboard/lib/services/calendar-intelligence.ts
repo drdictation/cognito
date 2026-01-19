@@ -576,18 +576,25 @@ export async function scheduleTaskIntelligent(
     if (slotResult.requiresBumping && slotResult.eventsToBump) {
         console.log(`Bumping ${slotResult.eventsToBump.length} events for ${taskPriority} task`)
         for (const eventToBump of slotResult.eventsToBump) {
-            // Find new slot for bumped event
+            // Find new slot for bumped event with EXTENDED deadline (2 weeks)
+            // Bumped events should always find a slot eventually
+            const extendedDeadline = new Date()
+            extendedDeadline.setDate(extendedDeadline.getDate() + 14)
+
             const bumpedSlotResult = await findSlotWithBumping(
                 eventToBump.scheduled_end && eventToBump.scheduled_start
                     ? Math.round((new Date(eventToBump.scheduled_end).getTime() - new Date(eventToBump.scheduled_start).getTime()) / 60000)
                     : 30,
                 eventToBump.priority,
-                eventToBump.deadline ? new Date(eventToBump.deadline) : getDefaultDeadline(eventToBump.priority),
+                extendedDeadline, // Use extended deadline, not original
                 eventToBump.priority === 'Critical'
             )
 
             if (bumpedSlotResult.slot) {
+                console.log(`  Bumping event to ${bumpedSlotResult.slot.start.toISOString()}`)
                 await bumpEvent(eventToBump.id, bumpedSlotResult.slot, taskId)
+            } else {
+                console.log(`  WARNING: Could not find new slot for bumped event: ${eventToBump.title}`)
             }
         }
     }
