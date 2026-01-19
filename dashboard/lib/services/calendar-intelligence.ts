@@ -122,13 +122,22 @@ export async function getConflicts(
             for (const event of events) {
                 if (!event.start || !event.end) continue
 
+                // Check if this is an all-day event (has date but not dateTime)
+                const isAllDay = !event.start.dateTime && !!event.start.date
+
+                // Skip all-day events from non-protected calendars
+                // (e.g., family calendar "Kiran summer school" is informational, not blocking)
+                const isProtected = await isProtectedCalendar(cal.summary || '')
+                if (isAllDay && !isProtected) {
+                    console.log(`    Skipping all-day event: ${event.summary} (non-protected calendar)`)
+                    continue
+                }
+
                 const eventStart = new Date(event.start.dateTime || event.start.date!)
                 const eventEnd = new Date(event.end.dateTime || event.end.date!)
 
                 // Check if there's overlap
                 if (eventStart < proposedEnd && eventEnd > proposedStart) {
-                    const isProtected = await isProtectedCalendar(cal.summary || '')
-
                     conflicts.push({
                         eventId: event.id!,
                         summary: event.summary || 'Untitled Event',
