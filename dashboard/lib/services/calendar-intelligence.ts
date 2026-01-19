@@ -310,10 +310,14 @@ export async function findSlotWithBumping(
             const bumpableEvents = await getBumpableEvents(slotStart, slotEnd, priority)
             console.log(`    Bumpable Cognito events: ${bumpableEvents.length}`)
 
-            // For CRITICAL tasks: schedule anyway, bump what we can
-            // Personal calendar conflicts are ignored - Critical tasks take precedence
-            if (isCritical) {
-                console.log(`    CRITICAL TASK: Force-scheduling despite conflicts`)
+            // Check if any conflict is also a Critical Cognito event (can't double-book Critical)
+            const hasCriticalConflict = conflicts.some(c =>
+                c.summary.includes('[Clinical]') || c.summary.includes('[Critical]')
+            )
+
+            // For CRITICAL tasks: schedule anyway IF no other Critical events in this slot
+            if (isCritical && !hasCriticalConflict) {
+                console.log(`    CRITICAL TASK: Force-scheduling (no other Critical events)`)
                 return {
                     slot: { start: slotStart, end: slotEnd },
                     requiresBumping: bumpableEvents.length > 0,
@@ -322,6 +326,11 @@ export async function findSlotWithBumping(
                         ? `Will bump ${bumpableEvents.length} existing tasks`
                         : undefined
                 }
+            }
+
+            // If there's a Critical conflict, log it and try next window
+            if (isCritical && hasCriticalConflict) {
+                console.log(`    SKIP: Another Critical task already in this slot`)
             }
 
             // For non-Critical tasks: only proceed if ALL conflicts are bumpable
