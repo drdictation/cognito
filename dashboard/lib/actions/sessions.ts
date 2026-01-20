@@ -2,17 +2,19 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { TaskSession, SessionStatus } from '@/lib/types/database'
+import type { TaskSession, SessionStatus, Priority } from '@/lib/types/database'
 
 /**
  * Create multiple linked sessions for a multi-session task
+ * PHASE 10: Last 50% of sessions are marked as Critical to prevent bumping
  */
 export async function createTaskSessions(
     taskId: string,
     sessionCount: number,
     durationMinutes: number,
     cadenceDays: number,
-    deadline?: Date
+    deadline?: Date,
+    basePriority?: Priority
 ): Promise<{ success: boolean; sessions?: TaskSession[]; error?: string }> {
     const supabase = createAdminClient()
 
@@ -21,22 +23,35 @@ export async function createTaskSessions(
         const sessions: Omit<TaskSession, 'id' | 'created_at' | 'updated_at'>[] = []
         const finalDeadline = deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Default: 30 days
 
+        // Session priority escalation: last 50% of sessions become Critical
+        // This protects the important final sessions from being bumped
+        const criticalThreshold = Math.ceil(sessionCount / 2) // e.g., for 4 sessions, sessions 3 & 4 are Critical
+
         for (let i = 0; i < sessionCount; i++) {
             // Work backwards: last session closest to deadline
             const daysBeforeDeadline = (sessionCount - 1 - i) * cadenceDays
             const sessionDeadline = new Date(finalDeadline)
             sessionDeadline.setDate(sessionDeadline.getDate() - daysBeforeDeadline)
 
+            // Determine session priority
+            // Session numbers are 1-indexed, so session (criticalThreshold + 1) onwards are Critical
+            const sessionNumber = i + 1
+            const isLaterSession = sessionNumber > criticalThreshold
+            const sessionPriority: Priority = isLaterSession ? 'Critical' : (basePriority || 'Normal')
+
+            console.log(`Session ${sessionNumber}/${sessionCount}: priority=${sessionPriority} (threshold=${criticalThreshold})`)
+
             sessions.push({
                 parent_task_id: taskId,
-                session_number: i + 1,
-                title: `Session ${i + 1} of ${sessionCount}`,
+                session_number: sessionNumber,
+                title: `Session ${sessionNumber} of ${sessionCount}`,
                 duration_minutes: durationMinutes,
                 scheduled_start: null,
                 scheduled_end: null,
                 google_event_id: null,
                 status: 'pending',
-                notes: null
+                notes: isLaterSession ? '⚠️ Protected session - cannot be bumped' : null,
+                priority: sessionPriority
             })
         }
 

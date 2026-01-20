@@ -1,10 +1,12 @@
 /**
- * Cognito Calendar Intelligence Service - Phase 7b
+ * Cognito Calendar Intelligence Service - Phase 10
  * Handles smart calendar features:
  * - Event detection from email content
- * - Priority-based slot finding with bumping
+ * - Priority AND DEADLINE-based slot finding with bumping (deadline is king)
+ * - High priority can bump Normal/Low (not just Critical)
  * - Conflict detection and resolution
- * - Protected calendar management
+ * - Protected calendar management (ICLOUD, SVHA, UNIMELB, FAMILY)
+ * - Double-book fallback with warnings
  */
 
 import { calendar_v3 } from 'googleapis'
@@ -36,6 +38,7 @@ interface SlotResult {
     requiresBumping: boolean
     eventsToBump?: CognitoEventRow[]
     cascadeWarning?: string
+    doubleBookWarning?: string  // Set when forced to double-book due to no available slots
 }
 
 interface Conflict {
@@ -158,11 +161,17 @@ export async function getConflicts(
 
 /**
  * Find Cognito-managed events that can be bumped
+ * DEADLINE IS KING: A task can bump another if:
+ * 1. It has higher priority, OR
+ * 2. It has a sooner deadline (regardless of priority)
+ * 
+ * Only Cognito-managed events can be bumped - external calendar events are never touched.
  */
 async function getBumpableEvents(
     start: Date,
     end: Date,
-    currentPriority: Priority
+    currentPriority: Priority,
+    currentDeadline?: Date
 ): Promise<CognitoEventRow[]> {
     const { data, error } = await (supabase
         .from('cognito_events') as any)
@@ -176,7 +185,6 @@ async function getBumpableEvents(
         return []
     }
 
-    // Filter by priority (can only bump lower or equal priority)
     const priorityOrder: Record<Priority, number> = {
         'Critical': 4,
         'High': 3,
@@ -188,7 +196,27 @@ async function getBumpableEvents(
 
     return data.filter((event: any) => {
         const eventPriorityValue = priorityOrder[event.priority as Priority]
-        return eventPriorityValue < currentPriorityValue
+        const eventDeadline = event.deadline ? new Date(event.deadline) : null
+
+        // Can bump if:
+        // 1. Current task has higher priority
+        const hasHigherPriority = eventPriorityValue < currentPriorityValue
+
+        // 2. DEADLINE IS KING: Current task has a sooner deadline
+        //    (only applies if both tasks have deadlines)
+        const hasSoonerDeadline = currentDeadline && eventDeadline &&
+            currentDeadline.getTime() < eventDeadline.getTime()
+
+        const canBump = hasHigherPriority || hasSoonerDeadline
+
+        if (canBump) {
+            console.log(`    Can bump '${event.title}' (priority: ${event.priority}, deadline: ${eventDeadline?.toISOString() || 'none'})`)
+            if (hasSoonerDeadline && !hasHigherPriority) {
+                console.log(`      Reason: DEADLINE IS KING - current deadline ${currentDeadline.toISOString()} < event deadline ${eventDeadline?.toISOString()}`)
+            }
+        }
+
+        return canBump
     })
 }
 
@@ -306,8 +334,8 @@ export async function findSlotWithBumping(
                 }
             }
 
-            // Get Cognito-managed events that can be bumped
-            const bumpableEvents = await getBumpableEvents(slotStart, slotEnd, priority)
+            // Get Cognito-managed events that can be bumped (passing deadline for DEADLINE IS KING logic)
+            const bumpableEvents = await getBumpableEvents(slotStart, slotEnd, priority, deadline)
             console.log(`    Bumpable Cognito events: ${bumpableEvents.length}`)
 
             // Check if any conflict is a Critical Cognito event in the database
@@ -327,9 +355,11 @@ export async function findSlotWithBumping(
                 criticalConflicts.forEach((c: any) => console.log(`      - ${c.scheduled_start} to ${c.scheduled_end}`))
             }
 
-            // For CRITICAL tasks: schedule anyway IF no other Critical events in this slot
-            if (isCritical && !hasCriticalConflict) {
-                console.log(`    CRITICAL TASK: Force-scheduling (no other Critical events)`)
+            // For CRITICAL or HIGH tasks: schedule anyway IF no Critical events in this slot
+            // HIGH can bump Normal/Low, CRITICAL can bump all except other Critical
+            const canForceSchedule = (isCritical || priority === 'High') && !hasCriticalConflict
+            if (canForceSchedule) {
+                console.log(`    ${priority.toUpperCase()} TASK: Force-scheduling (no Critical conflicts)`)
                 return {
                     slot: { start: slotStart, end: slotEnd },
                     requiresBumping: bumpableEvents.length > 0,
@@ -341,8 +371,8 @@ export async function findSlotWithBumping(
             }
 
             // If there's a Critical conflict, log it and try next window
-            if (isCritical && hasCriticalConflict) {
-                console.log(`    SKIP: Another Critical task already in this slot`)
+            if ((isCritical || priority === 'High') && hasCriticalConflict) {
+                console.log(`    SKIP: A Critical task already in this slot, trying next window`)
             }
 
             // For non-Critical tasks: only proceed if ALL conflicts are bumpable
@@ -369,6 +399,43 @@ export async function findSlotWithBumping(
     }
 
     // No slot found within deadline
+    // For Critical tasks: FORCE DOUBLE-BOOK with warning (user requested this behavior)
+    if (isCritical) {
+        console.log('=== CRITICAL FALLBACK: No slot found, forcing double-book ===')
+
+        // Find the earliest possible slot (first available window, ignoring conflicts)
+        const fallbackDate = new Date(now)
+        fallbackDate.setMinutes(Math.ceil(fallbackDate.getMinutes() / 30) * 30, 0, 0)
+
+        // Search for the first available window to double-book into
+        for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
+            const checkDate = new Date(fallbackDate)
+            checkDate.setDate(checkDate.getDate() + dayOffset)
+            checkDate.setHours(0, 0, 0, 0)
+
+            const dayOfWeek = checkDate.getDay()
+            const windows = await getSchedulingWindows(dayOfWeek, true)
+
+            for (const window of windows) {
+                const [startHour, startMin] = window.start_time.split(':').map(Number)
+                const windowStart = new Date(checkDate)
+                windowStart.setHours(startHour, startMin, 0, 0)
+
+                // Skip if in the past
+                if (windowStart < now) continue
+
+                const slotEnd = new Date(windowStart.getTime() + durationMinutes * 60 * 1000)
+
+                console.log(`  Double-booking into: ${windowStart.toISOString()}`)
+                return {
+                    slot: { start: windowStart, end: slotEnd },
+                    requiresBumping: false,
+                    doubleBookWarning: `⚠️ DOUBLE-BOOKED: No available slot before deadline. This Critical task overlaps with existing events.`
+                }
+            }
+        }
+    }
+
     return {
         slot: null,
         requiresBumping: false
@@ -544,7 +611,7 @@ export async function scheduleTaskIntelligent(
     trelloUrl?: string,
     priority?: Priority,
     deadline?: Date
-): Promise<{ eventId: string; eventUrl: string; scheduledStart: Date; scheduledEnd: Date } | null> {
+): Promise<{ eventId: string; eventUrl: string; scheduledStart: Date; scheduledEnd: Date; doubleBookWarning?: string } | null> {
     console.log('=== scheduleTaskIntelligent CALLED ===')
     console.log('TaskId:', taskId)
     console.log('Subject:', subject)
@@ -671,11 +738,17 @@ export async function scheduleTaskIntelligent(
             // Don't fail the whole operation
         }
 
+        // Log double-book warning if present
+        if (slotResult.doubleBookWarning) {
+            console.log(`⚠️ ${slotResult.doubleBookWarning}`)
+        }
+
         return {
             eventId: event.id!,
             eventUrl: event.htmlLink!,
             scheduledStart: slotResult.slot.start,
-            scheduledEnd: slotResult.slot.end
+            scheduledEnd: slotResult.slot.end,
+            doubleBookWarning: slotResult.doubleBookWarning
         }
     } catch (e) {
         console.error('Failed to create calendar event:', e)

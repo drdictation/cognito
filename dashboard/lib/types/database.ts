@@ -85,6 +85,7 @@ export interface InboxTask {
     calendar_event_id: string | null
     scheduled_start: string | null
     scheduled_end: string | null
+    double_book_warning: string | null // Phase 10: Warning if force-scheduled
     // Phase 4c: Model Tracking
     model_used: string | null
     // Phase 5: Intelligent Drafting
@@ -205,6 +206,7 @@ export interface TaskSession {
     google_event_id: string | null
     status: SessionStatus
     notes: string | null
+    priority: Priority  // Phase 10: Last 50% of sessions are Critical
     created_at: string
     updated_at: string
 }

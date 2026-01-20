@@ -62,7 +62,7 @@ export async function updateTaskStatus(
     taskId: string,
     status: TaskStatus,
     snoozedUntil?: string
-): Promise<{ success: boolean; error?: string; trelloUrl?: string }> {
+): Promise<{ success: boolean; error?: string; trelloUrl?: string; doubleBookWarning?: string }> {
     const supabase = createAdminClient()
 
     // Fetch the task to get AI assessment
@@ -142,8 +142,22 @@ export async function updateTaskStatus(
         }
     }
 
+    // Capture double_book_warning if it was set during execution
+    let doubleBookWarning: string | undefined
+    if (status === 'approved') {
+        const { data: updatedTask } = await (supabase
+            .from('inbox_queue') as any)
+            .select('double_book_warning')
+            .eq('id', taskId)
+            .single()
+
+        if (updatedTask?.double_book_warning) {
+            doubleBookWarning = updatedTask.double_book_warning
+        }
+    }
+
     revalidatePath('/')
-    return { success: true, trelloUrl }
+    return { success: true, trelloUrl, doubleBookWarning }
 }
 
 export async function tweakTask(

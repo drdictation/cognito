@@ -98,7 +98,17 @@ export function TaskCard({ task, index }: TaskCardProps) {
             const result = await updateTaskStatus(task.id, status, snoozedUntil)
 
             if (result.success) {
-                toast.success(`Task ${action}ed successfully`)
+                if (result.doubleBookWarning) {
+                    toast.warning(result.doubleBookWarning, {
+                        duration: 8000, // Show for longer
+                        action: {
+                            label: 'Dismiss',
+                            onClick: () => console.log('Dismissed')
+                        }
+                    })
+                } else {
+                    toast.success(`Task ${action}ed successfully`)
+                }
             } else {
                 toast.error(result.error || 'Failed to update task')
             }
@@ -293,7 +303,7 @@ export function TaskCard({ task, index }: TaskCardProps) {
                             <div className="mb-4">
                                 <DeadlinePicker
                                     initialDate={deadline ? new Date(deadline) : undefined}
-                                    onSave={async (date) => {
+                                    onSave={async (date: Date) => {
                                         setIsDeadlinePickerOpen(false)
                                         // Optimistic update
                                         setDeadline(date.toISOString())

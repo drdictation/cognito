@@ -309,6 +309,7 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
         eventUrl: string
         scheduledStart: Date
         scheduledEnd: Date
+        doubleBookWarning?: string
     } | null = null
 
     try {
@@ -329,6 +330,9 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
         )
         if (calendarResult) {
             console.log(`Calendar event created: ${calendarResult.eventUrl}`)
+            if (calendarResult.doubleBookWarning) {
+                console.warn(`Double-book warning: ${calendarResult.doubleBookWarning}`)
+            }
         }
     } catch (e) {
         console.warn('Calendar scheduling skipped:', e)
@@ -348,6 +352,9 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
         updatePayload.calendar_event_id = calendarResult.eventId
         updatePayload.scheduled_start = calendarResult.scheduledStart.toISOString()
         updatePayload.scheduled_end = calendarResult.scheduledEnd.toISOString()
+        if (calendarResult.doubleBookWarning) {
+            updatePayload.double_book_warning = calendarResult.doubleBookWarning
+        }
     }
 
     const { error: updateError } = await (supabase
