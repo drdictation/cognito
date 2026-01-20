@@ -92,7 +92,7 @@ export function SessionsSuggestion({
                                         max="10"
                                         value={sessionCount}
                                         onChange={(e) => setSessionCount(parseInt(e.target.value))}
-                                        className="w-full text-sm border rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 outline-none"
+                                        className="w-full text-sm text-gray-900 border rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 outline-none"
                                     />
                                 </div>
                                 <div>
@@ -104,7 +104,7 @@ export function SessionsSuggestion({
                                         step="15"
                                         value={duration}
                                         onChange={(e) => setDuration(parseInt(e.target.value))}
-                                        className="w-full text-sm border rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 outline-none"
+                                        className="w-full text-sm text-gray-900 border rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 outline-none"
                                     />
                                 </div>
                                 <div>
@@ -115,7 +115,7 @@ export function SessionsSuggestion({
                                         max="7"
                                         value={cadence}
                                         onChange={(e) => setCadence(parseInt(e.target.value))}
-                                        className="w-full text-sm border rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 outline-none"
+                                        className="w-full text-sm text-gray-900 border rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 outline-none"
                                     />
                                 </div>
                             </div>

@@ -207,6 +207,7 @@ export interface TaskSession {
     status: SessionStatus
     notes: string | null
     priority: Priority  // Phase 10: Last 50% of sessions are Critical
+    cadence_days: number  // Phase 10b: Days between sessions for backward scheduling
     created_at: string
     updated_at: string
 }

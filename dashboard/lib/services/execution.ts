@@ -303,7 +303,12 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
         return { success: false, error: 'Failed to create Trello card' }
     }
 
-    // Phase 3c: Create calendar time block using INTELLIGENT scheduler
+    // Phase 3c: Check for linked sessions first (Multi-Session Handling)
+    const { getSessionsForTask } = await import('@/lib/actions/sessions')
+    const sessions = await getSessionsForTask(taskId)
+    const { scheduleTaskIntelligent } = await import('./calendar-intelligence')
+    const typedTask = task as InboxTask
+
     let calendarResult: {
         eventId: string
         eventUrl: string
@@ -312,31 +317,100 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
         doubleBookWarning?: string
     } | null = null
 
-    try {
-        // Use intelligent scheduler with database-driven windows and bumping
-        const { scheduleTaskIntelligent } = await import('./calendar-intelligence')
-        const typedTask = task as InboxTask
-        calendarResult = await scheduleTaskIntelligent(
-            taskId,
-            typedTask.subject || 'Cognito Task',
-            typedTask.ai_domain || 'Task',
-            typedTask.ai_summary || '',
-            typedTask.ai_suggested_action || '',
-            typedTask.ai_estimated_minutes || 30,
-            cardResult.cardUrl,
-            typedTask.ai_priority || 'Normal',
-            typedTask.user_deadline ? new Date(typedTask.user_deadline) :
-                typedTask.deadline ? new Date(typedTask.deadline) : undefined
-        )
-        if (calendarResult) {
-            console.log(`Calendar event created: ${calendarResult.eventUrl}`)
-            if (calendarResult.doubleBookWarning) {
-                console.warn(`Double-book warning: ${calendarResult.doubleBookWarning}`)
+    if (sessions.length > 0) {
+        console.log(`=== EXECUTING MULTI-SESSION TASK (${sessions.length} chunks) ===`)
+
+        // Get task deadline for backward scheduling
+        const taskDeadline = typedTask.user_deadline
+            ? new Date(typedTask.user_deadline)
+            : typedTask.deadline
+                ? new Date(typedTask.deadline)
+                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Default: 30 days from now
+
+        // Get cadence from first session (all sessions have same cadence)
+        const cadenceDays = sessions[0].cadence_days || 3
+
+        console.log(`Task Deadline: ${taskDeadline.toISOString()}`)
+        console.log(`Cadence: ${cadenceDays} days between sessions`)
+        console.log(`Strategy: Schedule BACKWARD from deadline`)
+
+        // Loop and schedule each session BACKWARD from deadline
+        // Session N (last): scheduled closest to deadline
+        // Session 1 (first): scheduled furthest from deadline
+        for (let i = 0; i < sessions.length; i++) {
+            const session = sessions[i]
+            console.log(`Scheduling Session ${session.session_number}: ${session.title}`)
+
+            // Calculate how many days before deadline this session should be
+            // Session N -> 0 days before deadline
+            // Session N-1 -> cadence days before deadline
+            // Session 1 -> (N-1) * cadence days before deadline
+            const daysBeforeDeadline = (sessions.length - 1 - i) * cadenceDays
+            const targetDate = new Date(taskDeadline)
+            targetDate.setDate(targetDate.getDate() - daysBeforeDeadline)
+            targetDate.setHours(9, 0, 0, 0)  // Start search from 9am on target day
+
+            console.log(`  Target date: ${targetDate.toISOString()} (${daysBeforeDeadline} days before deadline)`)
+
+            const sessionResult = await scheduleTaskIntelligent(
+                taskId,
+                `${session.title}: ${typedTask.subject || 'Task'}`,
+                typedTask.ai_domain || 'Task',
+                typedTask.ai_summary || '',
+                typedTask.ai_suggested_action || '',
+                session.duration_minutes,
+                cardResult.cardUrl,
+                session.priority || typedTask.ai_priority || 'Normal',
+                taskDeadline,  // Use task deadline for bumping logic
+                targetDate     // Start search from calculated target date
+            )
+
+            if (sessionResult) {
+                console.log(`  -> Scheduled: ${sessionResult.scheduledStart.toISOString()}`)
+
+                // Update session record
+                await (supabase
+                    .from('task_sessions') as any)
+                    .update({
+                        scheduled_start: sessionResult.scheduledStart.toISOString(),
+                        scheduled_end: sessionResult.scheduledEnd.toISOString(),
+                        google_event_id: sessionResult.eventId,
+                        status: 'scheduled',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', session.id)
+
+                // Use first session as the "main" result for parent task display
+                if (i === 0) calendarResult = sessionResult
+                if (sessionResult.doubleBookWarning) calendarResult!.doubleBookWarning = sessionResult.doubleBookWarning
+            } else {
+                console.warn(`  -> FAILED to schedule session ${session.session_number}`)
             }
         }
-    } catch (e) {
-        console.warn('Calendar scheduling skipped:', e)
-        // Don't fail if calendar fails - Trello card is still created
+    } else {
+        // Standard single-task scheduling (original logic)
+        try {
+            calendarResult = await scheduleTaskIntelligent(
+                taskId,
+                typedTask.subject || 'Cognito Task',
+                typedTask.ai_domain || 'Task',
+                typedTask.ai_summary || '',
+                typedTask.ai_suggested_action || '',
+                typedTask.ai_estimated_minutes || 30,
+                cardResult.cardUrl,
+                typedTask.ai_priority || 'Normal',
+                typedTask.user_deadline ? new Date(typedTask.user_deadline) :
+                    typedTask.deadline ? new Date(typedTask.deadline) : undefined
+            )
+            if (calendarResult) {
+                console.log(`Calendar event created: ${calendarResult.eventUrl}`)
+                if (calendarResult.doubleBookWarning) {
+                    console.warn(`Double-book warning: ${calendarResult.doubleBookWarning}`)
+                }
+            }
+        } catch (e) {
+            console.warn('Calendar scheduling skipped:', e)
+        }
     }
 
     // Update task with execution details

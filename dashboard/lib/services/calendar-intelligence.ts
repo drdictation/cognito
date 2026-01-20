@@ -252,18 +252,21 @@ export async function findSlotWithBumping(
     durationMinutes: number,
     priority: Priority,
     deadline: Date,
-    isCritical: boolean = false
+    isCritical: boolean = false,
+    searchStartDate?: Date
 ): Promise<SlotResult> {
     const now = new Date()
-    const searchEnd = new Date(Math.min(deadline.getTime(), now.getTime() + (14 * 24 * 60 * 60 * 1000)))
+    const start = searchStartDate || now
+    const searchEnd = new Date(Math.min(deadline.getTime(), start.getTime() + (30 * 24 * 60 * 60 * 1000))) // Look ahead 30 days from start
 
     console.log('=== findSlotWithBumping DEBUG ===')
-    console.log('Now:', now.toISOString(), '| Local:', now.toString())
+    console.log('Now:', now.toISOString())
+    console.log('Search Start:', start.toISOString())
     console.log('Duration:', durationMinutes, 'min | Priority:', priority, '| isCritical:', isCritical)
     console.log('Deadline:', deadline.toISOString())
-    console.log('Search window: now to', searchEnd.toISOString())
+    console.log('Search window:', start.toISOString(), 'to', searchEnd.toISOString())
 
-    let current = new Date(now)
+    let current = new Date(start)
     current.setMinutes(Math.ceil(current.getMinutes() / 30) * 30, 0, 0)
 
     const durationMs = durationMinutes * 60 * 1000
@@ -610,13 +613,15 @@ export async function scheduleTaskIntelligent(
     estimatedMinutes: number,
     trelloUrl?: string,
     priority?: Priority,
-    deadline?: Date
+    deadline?: Date,
+    searchStartDate?: Date
 ): Promise<{ eventId: string; eventUrl: string; scheduledStart: Date; scheduledEnd: Date; doubleBookWarning?: string } | null> {
     console.log('=== scheduleTaskIntelligent CALLED ===')
     console.log('TaskId:', taskId)
     console.log('Subject:', subject)
     console.log('Priority:', priority)
     console.log('Deadline:', deadline?.toISOString() || 'none')
+    console.log('Search Start:', searchStartDate?.toISOString() || 'now')
 
     const calendar = await getCalendarClient()
     if (!calendar) {
@@ -635,7 +640,8 @@ export async function scheduleTaskIntelligent(
         estimatedMinutes,
         taskPriority,
         taskDeadline,
-        isCritical
+        isCritical,
+        searchStartDate
     )
 
     if (!slotResult.slot) {

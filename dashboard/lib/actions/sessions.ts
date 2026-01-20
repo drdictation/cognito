@@ -51,7 +51,8 @@ export async function createTaskSessions(
                 google_event_id: null,
                 status: 'pending',
                 notes: isLaterSession ? '⚠️ Protected session - cannot be bumped' : null,
-                priority: sessionPriority
+                priority: sessionPriority,
+                cadence_days: cadenceDays  // Store for backward scheduling
             })
         }
 
