@@ -67,8 +67,16 @@ export function TaskCard({ task, index }: TaskCardProps) {
     const [showChunking, setShowChunking] = useState(!!task.ai_assessment?.multi_session)
 
 
-    const priority = task.ai_priority || 'Normal'
-    const domain = task.ai_domain || 'Admin'
+    // Defensive fallbacks - ensure we always have valid config keys
+    const rawPriority = task.ai_priority
+    const priority: Priority = (rawPriority && rawPriority in priorityConfig)
+        ? rawPriority as Priority
+        : 'Normal'
+
+    const rawDomain = task.ai_domain
+    const domain: Domain = (rawDomain && rawDomain in domainConfig)
+        ? rawDomain as Domain
+        : 'Admin'
 
     // Load detected calendar events
     useEffect(() => {
