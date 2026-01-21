@@ -321,11 +321,14 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
         console.log(`=== EXECUTING MULTI-SESSION TASK (${sessions.length} chunks) ===`)
 
         // Get task deadline for backward scheduling
+        // Phase 11: Prefer AI inferred deadline if explicit user/system deadline missing
         const taskDeadline = typedTask.user_deadline
             ? new Date(typedTask.user_deadline)
             : typedTask.deadline
                 ? new Date(typedTask.deadline)
-                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Default: 30 days from now
+                : typedTask.ai_inferred_deadline
+                    ? new Date(typedTask.ai_inferred_deadline)
+                    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Default: 30 days from now
 
         // Get cadence from first session (all sessions have same cadence)
         const cadenceDays = sessions[0].cadence_days || 3
@@ -333,6 +336,9 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
         console.log(`Task Deadline: ${taskDeadline.toISOString()}`)
         console.log(`Cadence: ${cadenceDays} days between sessions`)
         console.log(`Strategy: Schedule BACKWARD from deadline`)
+
+        // Keep track of locally scheduled slots to prevent race conditions with Google Calendar API
+        const scheduledSlots: { start: Date; end: Date }[] = []
 
         // Loop and schedule each session BACKWARD from deadline
         // Session N (last): scheduled closest to deadline
@@ -371,11 +377,18 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
                 cardResult.cardUrl,
                 session.priority || typedTask.ai_priority || 'Normal',
                 taskDeadline,  // Use task deadline for bumping logic
-                targetDate     // Start search from calculated target date
+                targetDate,     // Start search from calculated target date
+                scheduledSlots  // Exclude slots we just booked in this loop
             )
 
             if (sessionResult) {
                 console.log(`  -> Scheduled: ${sessionResult.scheduledStart.toISOString()}`)
+
+                // Add to local exclusion list
+                scheduledSlots.push({
+                    start: sessionResult.scheduledStart,
+                    end: sessionResult.scheduledEnd
+                })
 
                 // Update session record
                 await (supabase

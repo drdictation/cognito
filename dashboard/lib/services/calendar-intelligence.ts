@@ -253,7 +253,8 @@ export async function findSlotWithBumping(
     priority: Priority,
     deadline: Date,
     isCritical: boolean = false,
-    searchStartDate?: Date
+    searchStartDate?: Date,
+    excludeSlots?: { start: Date; end: Date }[]
 ): Promise<SlotResult> {
     const now = new Date()
     const start = searchStartDate || now
@@ -313,6 +314,19 @@ export async function findSlotWithBumping(
             const slotEnd = new Date(slotStart.getTime() + durationMs)
 
             console.log(`    Proposed slot: ${slotStart.toISOString()} - ${slotEnd.toISOString()}`)
+
+            // Check manually excluded slots (from multi-session batching)
+            if (excludeSlots && excludeSlots.length > 0) {
+                const hasOverlap = excludeSlots.some(slot =>
+                    (slotStart < slot.end && slotEnd > slot.start)
+                )
+                if (hasOverlap) {
+                    console.log(`    SKIP: overlaps with excluded slot`)
+                    // Skip ahead by 30 mins
+                    current = new Date(current.getTime() + 30 * 60 * 1000)
+                    continue
+                }
+            }
 
             // Check if slot fits in window
             if (slotEnd > windowEnd) {
@@ -614,7 +628,8 @@ export async function scheduleTaskIntelligent(
     trelloUrl?: string,
     priority?: Priority,
     deadline?: Date,
-    searchStartDate?: Date
+    searchStartDate?: Date,
+    excludeSlots?: { start: Date; end: Date }[]
 ): Promise<{ eventId: string; eventUrl: string; scheduledStart: Date; scheduledEnd: Date; doubleBookWarning?: string } | null> {
     console.log('=== scheduleTaskIntelligent CALLED ===')
     console.log('TaskId:', taskId)
@@ -641,7 +656,8 @@ export async function scheduleTaskIntelligent(
         taskPriority,
         taskDeadline,
         isCritical,
-        searchStartDate
+        searchStartDate,
+        excludeSlots
     )
 
     if (!slotResult.slot) {

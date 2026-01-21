@@ -83,11 +83,17 @@ export async function updateTaskStatus(
 
     // Phase 7b: Set default deadline if not already set
     if (status === 'approved' && task && !task.deadline) {
-        const { getDefaultDeadline } = await import('@/lib/services/calendar-intelligence')
-        const priority = (task.ai_priority || 'Normal') as Priority
-        const deadline = getDefaultDeadline(priority)
-        updateData.deadline = deadline.toISOString()
-        updateData.deadline_source = 'default'
+        if (task.ai_inferred_deadline) {
+            // Prefer the AI inferred deadline (e.g. from prompt) over generic default
+            updateData.deadline = task.ai_inferred_deadline
+            updateData.deadline_source = 'ai_inferred'
+        } else {
+            const { getDefaultDeadline } = await import('@/lib/services/calendar-intelligence')
+            const priority = (task.ai_priority || 'Normal') as Priority
+            const deadline = getDefaultDeadline(priority)
+            updateData.deadline = deadline.toISOString()
+            updateData.deadline_source = 'default'
+        }
     }
 
     const { error } = await (supabase
