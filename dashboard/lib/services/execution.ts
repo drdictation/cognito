@@ -346,9 +346,18 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
             // Session N-1 -> cadence days before deadline
             // Session 1 -> (N-1) * cadence days before deadline
             const daysBeforeDeadline = (sessions.length - 1 - i) * cadenceDays
-            const targetDate = new Date(taskDeadline)
+            let targetDate = new Date(taskDeadline)
             targetDate.setDate(targetDate.getDate() - daysBeforeDeadline)
             targetDate.setHours(9, 0, 0, 0)  // Start search from 9am on target day
+
+            // CRITICAL SAFEGUARD: Never schedule in the past
+            // If target date is before now, clamp it to now (plus small buffer)
+            const now = new Date()
+            if (targetDate < now) {
+                console.log(`  Adjusting target date from ${targetDate.toISOString()} to NOW (preventing past scheduling)`)
+                targetDate = new Date(now)
+                targetDate.setMinutes(Math.ceil(now.getMinutes() / 30) * 30 + 30) // Next 30m slot
+            }
 
             console.log(`  Target date: ${targetDate.toISOString()} (${daysBeforeDeadline} days before deadline)`)
 

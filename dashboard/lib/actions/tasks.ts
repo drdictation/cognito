@@ -234,6 +234,51 @@ interface BriefingStats {
     }[]
 }
 
+/**
+ * Reject a task AND add the sender to the blocklist in one action.
+ * This is useful for junk mail that you want to filter in the future.
+ */
+export async function rejectAndBlockSender(
+    taskId: string,
+    senderEmail: string
+): Promise<{ success: boolean; error?: string }> {
+    const supabase = createAdminClient()
+
+    // 1. Reject the task
+    const { error: updateError } = await (supabase
+        .from('inbox_queue') as any)
+        .update({ status: 'rejected' })
+        .eq('id', taskId)
+
+    if (updateError) {
+        console.error('Error rejecting task:', updateError)
+        return { success: false, error: updateError.message }
+    }
+
+    // 2. Add sender to blocklist
+    // Extract the domain or use exact email depending on pattern
+    // Using exact email for now to be more precise
+    const { error: blocklistError } = await (supabase
+        .from('blocklist') as any)
+        .insert({
+            email_pattern: senderEmail,
+            reason: 'Blocked via Reject & Block action',
+            is_active: true,
+        })
+
+    if (blocklistError) {
+        // If it's a duplicate, that's fine - the sender is already blocked
+        if (!blocklistError.message?.includes('duplicate')) {
+            console.error('Error adding to blocklist:', blocklistError)
+            // Don't fail the whole operation - the task was rejected successfully
+        }
+    }
+
+    revalidatePath('/')
+    revalidatePath('/admin')
+    return { success: true }
+}
+
 export async function getBriefingStats(): Promise<BriefingStats> {
     const supabase = createAdminClient()
 

@@ -19,6 +19,7 @@
   - [x] Reject (removes from view).
   - [x] Snooze (hides until tomorrow).
   - [x] Tweak (corrects AI assessment).
+  - [x] **Reject & Block:** (Reject + Add sender to blocklist).
 
 ## 🟢 Phase 3: Execution Engine [Completed]
 - [x] **Trello Integration:**

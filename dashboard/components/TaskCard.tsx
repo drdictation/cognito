@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { InboxTask, Priority, Domain, DetectedEventRow } from '@/lib/types/database'
-import { updateTaskStatus, tweakTask } from '@/lib/actions/tasks'
+import { updateTaskStatus, tweakTask, rejectAndBlockSender } from '@/lib/actions/tasks'
 import { getDetectedEventsForTask } from '@/lib/actions/calendar-events'
 import {
     Check,
@@ -18,7 +18,8 @@ import {
     Minus,
     Calendar as CalendarIcon,
     SlidersHorizontal,
-    AlertCircle
+    AlertCircle,
+    Ban
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DraftEditor } from './DraftEditor'
@@ -119,6 +120,31 @@ export function TaskCard({ task, index }: TaskCardProps) {
                 }
             } else {
                 toast.error(result.error || 'Failed to update task')
+            }
+        } catch (error) {
+            toast.error('An error occurred')
+            console.error(error)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    async function handleRejectAndBlock() {
+        if (!task.real_sender) {
+            toast.error('No sender email found')
+            return
+        }
+
+        setIsLoading(true)
+        try {
+            const result = await rejectAndBlockSender(task.id, task.real_sender)
+
+            if (result.success) {
+                toast.success(`Rejected and blocked ${task.real_sender}`, {
+                    description: 'Future emails from this sender will be filtered.'
+                })
+            } else {
+                toast.error(result.error || 'Failed to reject and block')
             }
         } catch (error) {
             toast.error('An error occurred')
@@ -501,9 +527,20 @@ export function TaskCard({ task, index }: TaskCardProps) {
                     onClick={() => handleAction('reject')}
                     disabled={isLoading}
                     className="btn-ghost text-sm flex items-center gap-1.5 text-destructive hover:bg-destructive/10"
+                    title="Reject this task"
                 >
                     <X size={16} />
                     <span className="hidden sm:inline">Reject</span>
+                </button>
+
+                <button
+                    onClick={handleRejectAndBlock}
+                    disabled={isLoading}
+                    className="btn-ghost text-sm flex items-center gap-1.5 text-destructive/80 hover:bg-destructive/10"
+                    title="Reject and block this sender"
+                >
+                    <Ban size={16} />
+                    <span className="hidden sm:inline">Block</span>
                 </button>
 
                 <button
