@@ -42,6 +42,10 @@ export async function createManualTask(content: string): Promise<CreateTaskResul
             ai_summary: assessment.summary,
             ai_suggested_action: assessment.suggested_action,
             ai_estimated_minutes: assessment.estimated_minutes,
+            // CRITICAL: Include deadline fields that were missing!
+            ai_inferred_deadline: assessment.inferred_deadline || null,
+            ai_deadline_confidence: assessment.deadline_confidence || null,
+            ai_deadline_source: assessment.deadline_source || null,
             status: 'pending',
             model_used: 'gemini-2.0-flash-lite',
         }
