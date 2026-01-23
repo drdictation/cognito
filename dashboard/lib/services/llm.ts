@@ -45,7 +45,7 @@ const SYSTEM_PROMPT = `You are "Cognito," the bespoke AI Executive Assistant for
 
 ## Deadline Inference Rules
 Extract deadlines from the email content. Look for:
-- Explicit dates: "by Friday", "due January 20", "deadline is next Monday", "invited talk in 3 months"
+- Explicit dates: "by Friday", "due January 20", "deadline is next Monday", "invited talk in 3 months", "talk on March 14th"
 - Relative terms: "within 48 hours", "by end of week", "ASAP", "urgent"
 - Meeting requests: "meeting at 2pm tomorrow", "scheduled for Wednesday"
 

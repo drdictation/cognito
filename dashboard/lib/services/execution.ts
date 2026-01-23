@@ -333,8 +333,23 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
         // Get cadence from first session (all sessions have same cadence)
         const cadenceDays = sessions[0].cadence_days || 3
 
+        // ADAPTIVE CADENCE (Phase 11b)
+        // If deadline is too tight, reduce cadence instead of clamping everything to 'now'
+        const now = new Date()
+        const daysToDeadline = Math.max(0, (taskDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        const requiredDays = sessions.length * cadenceDays
+
+        let effectiveCadence = cadenceDays
+        if (requiredDays > daysToDeadline && daysToDeadline > 0) {
+            // Squeeze sessions into available time
+            // e.g. 6 sessions in 3 days -> 0.5 days (12 hours) apart
+            effectiveCadence = Math.max(0.2, (daysToDeadline - 1) / sessions.length) // Minimum 5 hours apart
+            console.log(`⚠️ Deadline Constraint: ${daysToDeadline.toFixed(1)} days available for ${sessions.length} sessions (wanted ${requiredDays})`)
+            console.log(`   -> Reducing cadence from ${cadenceDays} to ${effectiveCadence.toFixed(2)} days`)
+        }
+
         console.log(`Task Deadline: ${taskDeadline.toISOString()}`)
-        console.log(`Cadence: ${cadenceDays} days between sessions`)
+        console.log(`Cadence: ${cadenceDays} days (Effective: ${effectiveCadence.toFixed(2)})`)
         console.log(`Strategy: Schedule BACKWARD from deadline`)
 
         // Keep track of locally scheduled slots to prevent race conditions with Google Calendar API
@@ -349,23 +364,33 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
 
             // Calculate how many days before deadline this session should be
             // Session N -> 0 days before deadline
-            // Session N-1 -> cadence days before deadline
-            // Session 1 -> (N-1) * cadence days before deadline
-            const daysBeforeDeadline = (sessions.length - 1 - i) * cadenceDays
+            // Session N-1 -> effectiveCadence days before deadline
+            const daysBeforeDeadline = (sessions.length - 1 - i) * effectiveCadence
             let targetDate = new Date(taskDeadline)
-            targetDate.setDate(targetDate.getDate() - daysBeforeDeadline)
-            targetDate.setHours(9, 0, 0, 0)  // Start search from 9am on target day
+            // Use time-based subtraction for fractional days
+            targetDate.setTime(targetDate.getTime() - (daysBeforeDeadline * 24 * 60 * 60 * 1000))
+
+            // If we are using standard cadence, we align to 9am.
+            // If we are compressed (fractional cadence), we keep the time flow? 
+            // Better to default to 9am but let scheduleTaskIntelligent search from there.
+            if (effectiveCadence >= 1) {
+                targetDate.setHours(9, 0, 0, 0)
+            } else {
+                // If compressed, targetDate might be 3pm. That's fine.
+                // But we should ensure it's not late night?
+                // scheduleTaskIntelligent -> findSlotWithBumping handles working hours.
+            }
 
             // CRITICAL SAFEGUARD: Never schedule in the past
             // If target date is before now, clamp it to now (plus small buffer)
-            const now = new Date()
-            if (targetDate < now) {
+            const checkNow = new Date()
+            if (targetDate < checkNow) {
                 console.log(`  Adjusting target date from ${targetDate.toISOString()} to NOW (preventing past scheduling)`)
-                targetDate = new Date(now)
-                targetDate.setMinutes(Math.ceil(now.getMinutes() / 30) * 30 + 30) // Next 30m slot
+                targetDate = new Date(checkNow)
+                targetDate.setMinutes(Math.ceil(checkNow.getMinutes() / 30) * 30 + 30) // Next 30m slot
             }
 
-            console.log(`  Target date: ${targetDate.toISOString()} (${daysBeforeDeadline} days before deadline)`)
+            console.log(`  Target date: ${targetDate.toISOString()} (${daysBeforeDeadline.toFixed(2)} days before deadline)`)
 
             const sessionResult = await scheduleTaskIntelligent(
                 taskId,

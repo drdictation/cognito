@@ -272,6 +272,7 @@ export async function findSlotWithBumping(
 
     const durationMs = durationMinutes * 60 * 1000
 
+    outerLoop:
     while (current < searchEnd) {
         const dayOfWeek = current.getDay()
         const windows = await getSchedulingWindows(dayOfWeek, isCritical)
@@ -324,7 +325,7 @@ export async function findSlotWithBumping(
                     console.log(`    SKIP: overlaps with excluded slot`)
                     // Skip ahead by 30 mins
                     current = new Date(current.getTime() + 30 * 60 * 1000)
-                    continue
+                    continue outerLoop
                 }
             }
 
