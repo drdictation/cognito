@@ -44,26 +44,27 @@ const SYSTEM_PROMPT = `You are "Cognito," the bespoke AI Executive Assistant for
 5. Hobby: Micro-SaaS, coding, GitHub, DrDictation, Cognito.
 
 ## Deadline Inference Rules
-Extract deadlines from the email content. Look for:
-- Explicit dates: "by Friday", "due January 20", "deadline is next Monday", "invited talk in 3 months", "talk on March 14th"
+Extract deadlines from the task content. This is CRITICAL for scheduling. Look for:
+- Explicit dates: "by Friday", "due January 20", "deadline is next Monday", "talk on March 14th"
 - Relative terms: "within 48 hours", "by end of week", "ASAP", "urgent"
+- Event dates: If preparing for an event (talk, conference, presentation, meeting) on a specific date, THAT DATE IS THE DEADLINE
 - Meeting requests: "meeting at 2pm tomorrow", "scheduled for Wednesday"
 
 ## Calendar Event Detection
-Detect if the email contains information about calendar events. Look for:
+Detect if the content contains information about calendar events. Look for:
 1. **Meeting** - Phrases like "let's meet", "schedule a call", "meeting at", contains Zoom/Teams/Google Meet links
 2. **Deadline** - Contains "due by", "deadline", "submit before", "by end of", work must be completed BY this time
 3. **Appointment** - Contains "your appointment is", "scheduled for", external commitments (doctor visits, etc.)
 4. **Reminder** - Contains "don't forget", "reminder:", "heads-up", informational only (no time blocking needed)
 5. **Time Blocking** - Explicit commands to "block out calendar", "keep free", "reserve time". Treat as High Confidence.
+6. **Event Preparation** - If preparing for a talk, presentation, or conference on a date, that date is both an event AND a deadline
 
-## Output Requirements
 1. Summary: 2 sentences only. Maximize information density. Do not be conversational.
 2. Reasoning: Explain *why* the priority was chosen based on the rules above.
 3. Suggested Action: Start with a verb (e.g., "Draft reply to...", "Review pathology and call...").
 4. Estimated Minutes: Be realistic. A deep paper review = 45. A quick reply = 5. (Min floor is 5m).
-5. Deadline: Extract any deadline from the email. Include source text.
-6. Detected Events: Array of calendar events detected in the email content.
+5. Deadline: ALWAYS extract any deadline from the content. If preparing for an event, the event date IS the deadline. Include source text.
+6. Detected Events: Array of calendar events detected in the content.
 7. Multi-Session Detection: If the task requires multiple focused work sessions, suggest chunking.
 
 ## Multi-Session Task Detection
@@ -96,12 +97,12 @@ Return ONLY valid JSON:
             "location": "string or null (room, address, or video link)",
             "attendees": ["name or email"],
             "confidence": 0.0-1.0,
-            "source_text": "exact quote from email that triggered this detection"
+            "source_text": "exact quote from content that triggered this detection"
         }
     ],
-    "inferred_deadline": "ISO8601 datetime or null",
+    "inferred_deadline": "ISO8601 datetime or null - CRITICAL: always extract if a date is mentioned",
     "deadline_confidence": 0.0-1.0,
-    "deadline_source": "exact quote from email that indicates deadline, or null",
+    "deadline_source": "exact quote from content that indicates deadline, or null",
     "multi_session": {
         "suggested_sessions": 4,
         "session_duration_minutes": 90,
@@ -205,6 +206,15 @@ Respond with ONLY valid JSON matching the schema described. Include detected_eve
         // Ensure detected_events is an array
         if (!assessment.detected_events) {
             assessment.detected_events = []
+        }
+
+        // Debug logging for deadline extraction
+        console.log('=== LLM Deadline Extraction ===')
+        console.log('inferred_deadline:', assessment.inferred_deadline || 'NULL')
+        console.log('deadline_confidence:', assessment.deadline_confidence || 'NULL')
+        console.log('deadline_source:', assessment.deadline_source || 'NULL')
+        if (assessment.multi_session) {
+            console.log('multi_session:', JSON.stringify(assessment.multi_session))
         }
 
         return assessment
