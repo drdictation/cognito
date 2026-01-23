@@ -381,6 +381,17 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
                 // scheduleTaskIntelligent -> findSlotWithBumping handles working hours.
             }
 
+            // WEEKEND PROTECTION: If target falls on weekend, move to previous Friday
+            // This prevents the scheduler from having a tiny search window on a day with no windows
+            const dayOfWeek = targetDate.getDay() // 0 = Sunday, 6 = Saturday
+            if (dayOfWeek === 0) { // Sunday
+                targetDate.setDate(targetDate.getDate() - 2) // Move to Friday
+                console.log(`  Weekend protection: Sunday → moved to Friday`)
+            } else if (dayOfWeek === 6) { // Saturday
+                targetDate.setDate(targetDate.getDate() - 1) // Move to Friday
+                console.log(`  Weekend protection: Saturday → moved to Friday`)
+            }
+
             // CRITICAL SAFEGUARD: Never schedule in the past
             // If target date is before now, clamp it to now (plus small buffer)
             const checkNow = new Date()
