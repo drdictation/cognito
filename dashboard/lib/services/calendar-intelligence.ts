@@ -338,14 +338,21 @@ export async function findSlotWithBumping(
 
             console.log(`  Checking window: ${window.name} (${windowStart.toISOString()} - ${windowEnd.toISOString()})`)
 
-            // Skip if current time is past this window
-            if (current > windowEnd) {
+            // Skip if current time is past this window (ONLY FORWARD SEARCH)
+            if (!searchBackward && current > windowEnd) {
                 console.log(`    SKIP: current time past window end`)
                 continue
             }
 
             // Adjust slot start to whichever is later: current time or window start
-            let slotStart = new Date(Math.max(current.getTime(), windowStart.getTime()))
+            let slotStart: Date
+            if (searchBackward) {
+                // For backward search, just use window start (since we know current > windowStart)
+                // We are searching days backward, but inside the day we take the first available window
+                slotStart = new Date(windowStart)
+            } else {
+                slotStart = new Date(Math.max(current.getTime(), windowStart.getTime()))
+            }
             const slotEnd = new Date(slotStart.getTime() + durationMs)
 
             console.log(`    Proposed slot: ${slotStart.toISOString()} - ${slotEnd.toISOString()}`)
