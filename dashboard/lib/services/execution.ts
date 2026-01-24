@@ -336,7 +336,9 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
         // ADAPTIVE CADENCE (Phase 11b)
         // If deadline is too tight, reduce cadence instead of clamping everything to 'now'
         const now = new Date()
-        const daysToDeadline = Math.max(0, (taskDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        // BUFFER: Subtract 1 day so we don't book ON the deadline day
+        const bufferDays = 1
+        const daysToDeadline = Math.max(0, (taskDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24) - bufferDays)
         const requiredDays = sessions.length * cadenceDays
 
         let effectiveCadence = cadenceDays
@@ -363,9 +365,9 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
             console.log(`Scheduling Session ${session.session_number}: ${session.title}`)
 
             // Calculate how many days before deadline this session should be
-            // Session N -> 0 days before deadline
-            // Session N-1 -> effectiveCadence days before deadline
-            const daysBeforeDeadline = (sessions.length - 1 - i) * effectiveCadence
+            // Session N -> 0 days before deadline + buffer
+            // Session N-1 -> effectiveCadence days before deadline + buffer
+            const daysBeforeDeadline = ((sessions.length - 1 - i) * effectiveCadence) + bufferDays
             let targetDate = new Date(taskDeadline)
             // Use time-based subtraction for fractional days
             targetDate.setTime(targetDate.getTime() - (daysBeforeDeadline * 24 * 60 * 60 * 1000))
