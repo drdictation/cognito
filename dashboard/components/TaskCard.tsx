@@ -578,11 +578,12 @@ export function TaskCard({ task, index }: TaskCardProps) {
 
                 <button
                     onClick={() => handleAction('approve')}
-                    disabled={isLoading}
-                    className="flex-1 btn-primary py-2 text-sm font-medium flex items-center justify-center gap-2"
+                    disabled={isLoading || showChunking}
+                    title={showChunking ? "Please accept or reject session chunking first" : undefined}
+                    className="flex-1 btn-primary py-2 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Check size={16} />
-                    <span>Approve</span>
+                    <span>{showChunking ? 'Review Plan' : 'Approve'}</span>
                 </button>
             </div>
         </div>
