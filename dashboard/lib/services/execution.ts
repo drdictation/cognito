@@ -416,7 +416,8 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
                 session.priority || typedTask.ai_priority || 'Normal',
                 taskDeadline,  // Use task deadline for bumping logic
                 targetDate,     // Start search from calculated target date
-                scheduledSlots  // Exclude slots we just booked in this loop
+                scheduledSlots,  // Exclude slots we just booked in this loop
+                i === sessions.length - 1  // searchBackward: true for last session only
             )
 
             if (sessionResult) {

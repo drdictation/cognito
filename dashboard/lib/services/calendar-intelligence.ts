@@ -254,13 +254,29 @@ export async function findSlotWithBumping(
     deadline: Date,
     isCritical: boolean = false,
     searchStartDate?: Date,
-    excludeSlots?: { start: Date; end: Date }[]
+    excludeSlots?: { start: Date; end: Date }[],
+    searchBackward: boolean = false
 ): Promise<SlotResult> {
     const now = new Date()
-    const start = searchStartDate || now
-    const searchEnd = new Date(Math.min(deadline.getTime(), start.getTime() + (30 * 24 * 60 * 60 * 1000))) // Look ahead 30 days from start
 
-    console.log('=== findSlotWithBumping DEBUG ===')
+    // For backward search: start from deadline-1 day, search towards now
+    // For forward search: start from searchStartDate or now, search towards deadline
+    let start: Date
+    let searchEnd: Date
+
+    if (searchBackward) {
+        // Start from day before deadline, search backwards to now
+        start = new Date(deadline)
+        start.setDate(start.getDate() - 1)
+        start.setHours(23, 59, 0, 0) // End of day before deadline
+        searchEnd = now
+        console.log('=== findSlotWithBumping DEBUG (BACKWARD MODE) ===')
+    } else {
+        start = searchStartDate || now
+        searchEnd = new Date(Math.min(deadline.getTime(), start.getTime() + (30 * 24 * 60 * 60 * 1000)))
+        console.log('=== findSlotWithBumping DEBUG ===')
+    }
+
     console.log('Now:', now.toISOString())
     console.log('Search Start:', start.toISOString())
     console.log('Duration:', durationMinutes, 'min | Priority:', priority, '| isCritical:', isCritical)
@@ -268,21 +284,39 @@ export async function findSlotWithBumping(
     console.log('Search window:', start.toISOString(), 'to', searchEnd.toISOString())
 
     let current = new Date(start)
-    current.setMinutes(Math.ceil(current.getMinutes() / 30) * 30, 0, 0)
+    if (searchBackward) {
+        current.setHours(23, 59, 0, 0) // Start from end of day for backward search
+    } else {
+        current.setMinutes(Math.ceil(current.getMinutes() / 30) * 30, 0, 0)
+    }
 
     const durationMs = durationMinutes * 60 * 1000
 
+    // Helper to check if we should continue searching
+    const shouldContinue = () => {
+        if (searchBackward) {
+            return current > searchEnd // Keep going while current > now
+        } else {
+            return current < searchEnd
+        }
+    }
+
     outerLoop:
-    while (current < searchEnd) {
+    while (shouldContinue()) {
         const dayOfWeek = current.getDay()
         const windows = await getSchedulingWindows(dayOfWeek, isCritical)
 
         console.log(`Day ${dayOfWeek} (${current.toDateString()}): ${windows.length} windows available`)
 
         if (windows.length === 0) {
-            // No windows for this day, skip to next day
-            current.setDate(current.getDate() + 1)
-            current.setHours(0, 0, 0, 0)
+            // No windows for this day, move to next/previous day
+            if (searchBackward) {
+                current.setDate(current.getDate() - 1)
+                current.setHours(23, 59, 0, 0)
+            } else {
+                current.setDate(current.getDate() + 1)
+                current.setHours(0, 0, 0, 0)
+            }
             continue
         }
 
@@ -411,9 +445,14 @@ export async function findSlotWithBumping(
             console.log(`    Cannot use this slot, trying next window`)
         }
 
-        // Move to next day
-        current.setDate(current.getDate() + 1)
-        current.setHours(0, 0, 0, 0)
+        // Move to next/previous day
+        if (searchBackward) {
+            current.setDate(current.getDate() - 1)
+            current.setHours(23, 59, 0, 0)
+        } else {
+            current.setDate(current.getDate() + 1)
+            current.setHours(0, 0, 0, 0)
+        }
     }
 
     // No slot found within deadline
@@ -630,7 +669,8 @@ export async function scheduleTaskIntelligent(
     priority?: Priority,
     deadline?: Date,
     searchStartDate?: Date,
-    excludeSlots?: { start: Date; end: Date }[]
+    excludeSlots?: { start: Date; end: Date }[],
+    searchBackward: boolean = false
 ): Promise<{ eventId: string; eventUrl: string; scheduledStart: Date; scheduledEnd: Date; doubleBookWarning?: string } | null> {
     console.log('=== scheduleTaskIntelligent CALLED ===')
     console.log('TaskId:', taskId)
@@ -638,6 +678,7 @@ export async function scheduleTaskIntelligent(
     console.log('Priority:', priority)
     console.log('Deadline:', deadline?.toISOString() || 'none')
     console.log('Search Start:', searchStartDate?.toISOString() || 'now')
+    console.log('Search Direction:', searchBackward ? 'BACKWARD' : 'forward')
 
     const calendar = await getCalendarClient()
     if (!calendar) {
@@ -658,7 +699,8 @@ export async function scheduleTaskIntelligent(
         taskDeadline,
         isCritical,
         searchStartDate,
-        excludeSlots
+        excludeSlots,
+        searchBackward
     )
 
     if (!slotResult.slot) {
