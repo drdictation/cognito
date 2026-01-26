@@ -45,7 +45,50 @@ function extractOriginalSender(email: Email): { sender: string; source: string }
     // Map sender domain to source account
     const source = mapSenderToSource(sender)
 
+    // Special handling for SVHA forwarded emails to clean headers
+    if (source === 'ms365_hospital') {
+        const { subject: cleanSubject, body: cleanBody } = cleanForwardedContent(email.subject, email.body)
+        if (cleanBody !== email.body) {
+            console.log('Cleaned SVHA forwarding headers from content')
+            // Mutate the email object temporarily for this processing scope
+            // logic implies we want to analyze the CLEANED content
+            email.subject = cleanSubject
+            email.body = cleanBody
+        }
+    }
+
     return { sender, source }
+}
+
+/**
+ * Clean forwarded email content, specifically for SVHA/Outlook forwarding blocks
+ */
+function cleanForwardedContent(subject: string, body: string): { subject: string, body: string } {
+    let cleanSubject = subject;
+    let cleanBody = body;
+
+    // 1. Clean Subject
+    // Remove "FW: " or "Fwd: " case insensitive from start
+    cleanSubject = cleanSubject.replace(/^((?:(?:FW|Fwd|RE|Re):\s*)+)/i, '').trim();
+
+    // 2. Clean Body
+    // Look for Outlook/Exchange style forwarding block
+    // From: ...
+    // Sent: ...
+    // To: ...
+    // Subject: ...
+    const forwardHeaderPattern = /From:\s*[\s\S]*?\n\s*Sent:\s*[\s\S]*?\n\s*To:\s*[\s\S]*?\n\s*Subject:\s*[\s\S]*?\n/i;
+
+    const match = cleanBody.match(forwardHeaderPattern);
+
+    if (match && match.index !== undefined) {
+        // Found a forwarding block.
+        // Remove this block and EVERYTHING BEFORE IT 
+        const endOfMatch = match.index + match[0].length;
+        cleanBody = cleanBody.substring(endOfMatch).trim();
+    }
+
+    return { subject: cleanSubject, body: cleanBody };
 }
 
 /**
@@ -140,17 +183,36 @@ function isNoFlyZone(domain?: string): boolean {
 /**
  * Save email and AI assessment to inbox_queue
  */
-async function saveToInboxQueue(
+export async function saveToInboxQueue(
     email: Email,
     assessment: any,
     originalSender: string,
     sourceAccount: string
 ): Promise<void> {
+    const isAutoTask = email.subject.toUpperCase().includes('COGNITO')
+    const initialStatus = isAutoTask ? 'approved' : 'pending'
+
+    // Phase 11: Smart Subject Replacement
+    // If subject is generic ("COGNITO", "FW:"), prefer the AI-generated smart_subject
+    let finalSubject = email.subject
+    if (assessment.smart_subject) {
+        const isGeneric =
+            email.subject.toUpperCase().includes('COGNITO') ||
+            email.subject.toUpperCase().startsWith('FW:') ||
+            email.subject.toUpperCase().startsWith('FWD:') ||
+            email.subject.trim().length === 0
+
+        if (isGeneric) {
+            console.log(`Replacing generic subject "${email.subject}" with smart_subject: "${assessment.smart_subject}"`)
+            finalSubject = assessment.smart_subject
+        }
+    }
+
     const data = {
         message_id: email.message_id,
         original_source_email: sourceAccount,
         real_sender: originalSender,
-        subject: email.subject,
+        subject: finalSubject,
         received_at: email.date,
         source: 'email',
         original_content: email.body,
@@ -161,22 +223,51 @@ async function saveToInboxQueue(
         ai_summary: assessment.summary,
         ai_suggested_action: assessment.suggested_action,
         ai_estimated_minutes: assessment.estimated_minutes,
-        status: 'pending',
+        status: initialStatus,
         ai_inferred_deadline: assessment.inferred_deadline || null,
         ai_deadline_confidence: assessment.deadline_confidence || null,
         ai_deadline_source: assessment.deadline_source || null,
         model_used: 'gemini-2.0-flash-lite',
         is_simple_response: assessment.is_simple_response || false,
         draft_response: assessment.draft_response || null,
-        execution_status: 'pending'
+        execution_status: isAutoTask ? 'scheduled' : 'pending'
     }
 
     try {
-        await (supabase
+        const { data: savedTask, error } = await (supabase
             .from('inbox_queue') as any)
             .upsert(data, { onConflict: 'message_id' })
+            .select('id')
+            .single()
 
-        console.log(`Saved to inbox_queue: ${email.subject}`)
+        if (error) throw error
+
+        console.log(`Saved to inbox_queue: ${email.subject} (Status: ${initialStatus})`)
+
+        // Phase 11: Auto-Task Execution
+        if (isAutoTask && savedTask?.id) {
+            console.log(`⚡ AUTO-TASK DETECTED: Executing ${savedTask.id}`)
+
+            // 1. Save detected events first (needed for scheduling)
+            if (assessment.detected_events) {
+                const { saveDetectedEvent } = await import('@/lib/services/calendar-intelligence')
+                for (const event of assessment.detected_events) {
+                    await saveDetectedEvent(savedTask.id, event)
+                }
+            }
+
+            // 2. Execute Task (Trello + Calendar)
+            const { executeTask } = await import('@/lib/services/execution')
+            await executeTask(savedTask.id)
+
+            // 3. Learning Loop
+            try {
+                const { generateKnowledgeSuggestion } = await import('@/lib/services/learning')
+                await generateKnowledgeSuggestion(savedTask.id)
+            } catch (e) {
+                console.error('Learning error during auto-task:', e)
+            }
+        }
     } catch (error) {
         console.error('Error saving to Supabase:', error)
         throw error

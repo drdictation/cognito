@@ -13,7 +13,16 @@ export interface Email {
     date: string
     body: string
     headers: Record<string, string>
+    attachments: EmailAttachment[]
 }
+
+export interface EmailAttachment {
+    filename: string
+    mimeType: string
+    size: number
+    attachmentId: string
+}
+
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GmailPart = any
@@ -64,6 +73,32 @@ function extractTextFromParts(part: GmailPart | null | undefined): string {
     }
 
     return ''
+}
+
+/**
+ * Extract attachments from email parts
+ */
+function extractAttachments(part: GmailPart | null | undefined, attachments: EmailAttachment[] = []): EmailAttachment[] {
+    if (!part) return attachments
+
+    // Check if this part is an attachment
+    if (part.filename && part.body?.attachmentId) {
+        attachments.push({
+            filename: part.filename,
+            mimeType: part.mimeType || 'application/octet-stream',
+            size: part.body.size || 0,
+            attachmentId: part.body.attachmentId
+        })
+    }
+
+    // Recursively search nested parts
+    if (part.parts && Array.isArray(part.parts)) {
+        for (const subPart of part.parts) {
+            extractAttachments(subPart, attachments)
+        }
+    }
+
+    return attachments
 }
 
 /**
@@ -133,6 +168,9 @@ export async function getEmailDetails(messageId: string): Promise<Email | null> 
         // Extract body using recursive helper for nested multipart emails
         const body = extractTextFromParts(message.payload) || ''
 
+        // Extract attachments
+        const attachments = extractAttachments(message.payload)
+
         return {
             id: messageId,
             message_id: headers['Message-ID'] || messageId,
@@ -140,7 +178,8 @@ export async function getEmailDetails(messageId: string): Promise<Email | null> 
             from: headers['From'] || 'Unknown',
             date: headers['Date'] || '',
             body,
-            headers
+            headers,
+            attachments
         }
     } catch (error) {
         console.error(`Error fetching email ${messageId}:`, error)

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { InboxTask, Priority, Domain, DetectedEventRow } from '@/lib/types/database'
 import { updateTaskStatus, tweakTask, rejectAndBlockSender } from '@/lib/actions/tasks'
 import { getDetectedEventsForTask } from '@/lib/actions/calendar-events'
+import { useTasks } from '@/contexts/TasksContext'
 import {
     Check,
     X,
@@ -48,6 +49,7 @@ const domainConfig: Record<Domain, { label: string; class: string; icon: string 
 }
 
 export function TaskCard({ task, index }: TaskCardProps) {
+    const { removeTask, updateTask } = useTasks()
     if (typeof window !== 'undefined') {
         console.log(`TaskCard ${task.id}:`, {
             hasOriginalContent: !!task.original_content,
@@ -89,7 +91,11 @@ export function TaskCard({ task, index }: TaskCardProps) {
     }, [task.id])
 
     async function handleAction(action: 'approve' | 'reject' | 'snooze') {
-        setIsLoading(true)
+        // OPTIMISTIC UPDATE: Remove task from UI immediately
+        removeTask(task.id)
+        toast.success(`Task ${action}ed successfully`)
+
+        // Background: Call server action
         try {
             const status = action === 'approve' ? 'approved'
                 : action === 'reject' ? 'rejected'
@@ -106,26 +112,20 @@ export function TaskCard({ task, index }: TaskCardProps) {
 
             const result = await updateTaskStatus(task.id, status, snoozedUntil)
 
-            if (result.success) {
-                if (result.doubleBookWarning) {
-                    toast.warning(result.doubleBookWarning, {
-                        duration: 8000, // Show for longer
-                        action: {
-                            label: 'Dismiss',
-                            onClick: () => console.log('Dismissed')
-                        }
-                    })
-                } else {
-                    toast.success(`Task ${action}ed successfully`)
-                }
-            } else {
+            if (!result.success) {
                 toast.error(result.error || 'Failed to update task')
+            } else if (result.doubleBookWarning) {
+                toast.warning(result.doubleBookWarning, {
+                    duration: 8000,
+                    action: {
+                        label: 'Dismiss',
+                        onClick: () => console.log('Dismissed')
+                    }
+                })
             }
         } catch (error) {
             toast.error('An error occurred')
             console.error(error)
-        } finally {
-            setIsLoading(false)
         }
     }
 
@@ -135,22 +135,22 @@ export function TaskCard({ task, index }: TaskCardProps) {
             return
         }
 
-        setIsLoading(true)
+        // OPTIMISTIC UPDATE: Remove task immediately
+        removeTask(task.id)
+        toast.success(`Rejected and blocked ${task.real_sender}`, {
+            description: 'Future emails from this sender will be filtered.'
+        })
+
+        // Background: Call server action
         try {
             const result = await rejectAndBlockSender(task.id, task.real_sender)
 
-            if (result.success) {
-                toast.success(`Rejected and blocked ${task.real_sender}`, {
-                    description: 'Future emails from this sender will be filtered.'
-                })
-            } else {
+            if (!result.success) {
                 toast.error(result.error || 'Failed to reject and block')
             }
         } catch (error) {
             toast.error('An error occurred')
             console.error(error)
-        } finally {
-            setIsLoading(false)
         }
     }
 
@@ -160,27 +160,31 @@ export function TaskCard({ task, index }: TaskCardProps) {
             return
         }
 
-        setIsLoading(true)
-        try {
-            const updates: { priority?: Priority; domain?: Domain; estimatedMinutes?: number } = {}
-            if (tweakUpdates.priority) updates.priority = tweakUpdates.priority
-            if (tweakUpdates.domain) updates.domain = tweakUpdates.domain
-            if (tweakUpdates.estimatedMinutes !== undefined) updates.estimatedMinutes = tweakUpdates.estimatedMinutes
+        // OPTIMISTIC UPDATE: Update task immediately
+        const updates: { priority?: Priority; domain?: Domain; estimatedMinutes?: number } = {}
+        if (tweakUpdates.priority) updates.priority = tweakUpdates.priority
+        if (tweakUpdates.domain) updates.domain = tweakUpdates.domain
+        if (tweakUpdates.estimatedMinutes !== undefined) updates.estimatedMinutes = tweakUpdates.estimatedMinutes
 
+        updateTask(task.id, {
+            ai_priority: updates.priority,
+            ai_domain: updates.domain,
+            ai_estimated_minutes: updates.estimatedMinutes
+        })
+        toast.success('Task updated and logged for learning')
+        setIsTweaking(false)
+        setTweakUpdates({})
+
+        // Background: Call server action
+        try {
             const result = await tweakTask(task.id, updates, task)
 
-            if (result.success) {
-                toast.success('Task updated and logged for learning')
-                setIsTweaking(false)
-                setTweakUpdates({})
-            } else {
+            if (!result.success) {
                 toast.error(result.error || 'Failed to update task')
             }
         } catch (error) {
             toast.error('An error occurred')
             console.error(error)
-        } finally {
-            setIsLoading(false)
         }
     }
 

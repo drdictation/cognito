@@ -141,6 +141,28 @@ When a user clicks **"Approve"**, the system orchestrates multiple APIs API call
 
 ---
 
+
+---
+
+### 4. Native Calendar & Time Tracking (Phase 10)
+
+**Service:** `lib/actions/time-tracking.ts` and `lib/actions/calendar-overlay.ts` handle the interactive calendar and time tracking logic.
+
+#### Key Features:
+*   **Native Calendar UI:**
+    *   Dedicated `/calendar` page fetching data from `v_today_calendar`.
+    *   **Google Calendar Overlay:** Read-only view of external events fetched via `calendar-overlay.ts` server action, merged with Cognito tasks.
+*   **Time Tracking State Machine:**
+    *   `pending` → `running` (Timer starts)
+    *   `running` → `paused` (Accumulates elapsed time)
+    *   `paused` → `running` (Resumes)
+    *   `running` → `completed` (Finalizes duration, calculates accuracy)
+*   **Trello Integration:**
+    *   When a task is `completed`, the system checks for email attachments.
+    *   Attachments are automatically uploaded to the corresponding Trello card via `trello-attachments.ts`.
+
+---
+
 ## Data Schema (Supabase)
 
 ### `inbox_queue` Table
@@ -206,6 +228,20 @@ Tracks individual sessions for multi-session tasks.
 | `scheduled_start` | TIMESTAMP | When this session is scheduled. |
 | `calendar_event_id` | TEXT | Google Calendar event ID for this session. |
 
+
+---
+
+### `time_logs` Table (Phase 10)
+Tracks actual execution time for tasks, enabling ML learning.
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `task_id` | UUID | Reference to parent task in inbox_queue. |
+| `status` | TEXT | running, paused, completed. |
+| `started_at` | TIMESTAMP | When work first began. |
+| `completed_at` | TIMESTAMP | When work finished. |
+| `elapsed_seconds` | INT | Total seconds spent working (excluding pauses). |
+| `session_count` | INT | Number of times the user worked on this. |
 
 ---
 

@@ -101,6 +101,25 @@
     * **Integrated UI:** SessionsSuggestion component in TaskCard for reviewing and accepting chunking recommendations.
 
 
+
+### H. Native Calendar & Time Tracking (Phase 10) [Completed]
+* **Native Calendar Page:**
+    * Dedicated `/calendar` route with 8am-10pm time grid.
+    * Read-only overlay of Google Calendar events for context.
+    * Interactive "Time Blocks" representing scheduled Cognito tasks.
+* **Execution & Time Tracking:**
+    * **Start/Stop Timer:** Users can start, pause, and resume tasks directly from the calendar.
+    * **Live Timer:** Persistent "Active Task" timer visible across the dashboard.
+    * **Actual vs. Estimated:** System records actual duration and calculates accuracy ratio for future learning.
+    * **Visual States:** Blue (Scheduled), Yellow (Running), Orange (Paused), Green (Completed).
+* **Analytics & Stats:**
+    * **Weekly Focus Hours:** Tracks total deep work time.
+    * **Task Completion Count:** Daily/Weekly velocity.
+    * **AI Accuracy:** Feedback loop on how well the AI estimated the duration.
+* **Trello Integration:**
+    * "Open in Trello" deep link on every time block.
+    * Automatic upload of email attachments to the Trello card upon task completion.
+
 ## 4. Success Metrics
 * **Accuracy:** User accepts >80% of AI prioritization suggestions without editing.
 * **Latency:** Daily Briefing generation takes <30 seconds.

@@ -4,6 +4,7 @@ import { NoFlyZoneIndicator } from '@/components/NoFlyZoneIndicator'
 import { RefreshButton } from '@/components/RefreshButton'
 import { AddTaskButton } from '@/components/AddTaskButton'
 import { PendingEventsList } from '@/components/PendingEventsList'
+import { TasksProvider } from '@/contexts/TasksContext'
 import { Calendar } from 'lucide-react'
 
 
@@ -56,7 +57,9 @@ export default async function DailyBriefingPage() {
       <PendingEventsList />
 
       {/* Briefing Content */}
-      <BriefingView tasks={tasks} />
+      <TasksProvider initialTasks={tasks}>
+        <BriefingView />
+      </TasksProvider>
 
       {/* Floating Add Task Button */}
       <AddTaskButton />

@@ -121,7 +121,22 @@
   - [x] Configurable parameters (session count, duration, cadence).
   - [x] Accept/reject workflow integrated into TaskCard.
 
-## 🔵 Phase 10: Future Expansion
+## 🟢 Phase 10: Native Calendar & Time Tracking [Completed]
+- [x] **Backend & Data Layer:**
+  - [x] **Time Logs Table:** `time_logs` for ML-ready time tracking.
+  - [x] **Completion Tracking:** Updates to `inbox_queue` with actual duration and accuracy.
+  - [x] **Server Actions:** `time-tracking.ts` (start/pause/resume/complete), `calendar-overlay.ts`, `trello-attachments.ts`.
+- [x] **Frontend Components:**
+  - [x] **Calendar Page:** `/calendar` route with time grid (8am-10pm).
+  - [x] **Calendar View:** Time blocks, date nav, Google Calendar overlay.
+  - [x] **Time Block:** Interactive states (Scheduled, Running, Paused, Completed).
+  - [x] **Active Task Timer:** Persistent timer with pulsing animation.
+  - [x] **Stats:** Weekly focus hours, task counts, AI accuracy.
+- [x] **Integration:**
+  - [x] **Trello:** "Open in Trello" links and attachment uploads.
+  - [x] **Google Calendar:** Read-only overlay of external events.
+
+## 🔵 Phase 11: Future Expansion
 - [ ] **Mobile App:** React Native wrapper for on-the-go triage.
 - [ ] **Math Alert:** Conflict detection logic.
 - [ ] **Recurring Task Templates:** AI learns from repeated patterns.

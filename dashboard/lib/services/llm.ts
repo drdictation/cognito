@@ -66,6 +66,7 @@ Detect if the content contains information about calendar events. Look for:
 5. Deadline: ALWAYS extract any deadline from the content. If preparing for an event, the event date IS the deadline. Include source text.
 6. Detected Events: Array of calendar events detected in the content.
 7. Multi-Session Detection: If the task requires multiple focused work sessions, suggest chunking.
+8. Intelligent Naming: Generate a "smart_subject" - a concise (max 60 chars), action-oriented title that replaces generic subjects like "FW: Email" or "COGNITO". e.g. "Review Pathology for Mrs. Jones" instead of "Fwd: Pathology".
 
 ## Multi-Session Task Detection
 Detect tasks that benefit from multiple work sessions spread over days:
@@ -81,6 +82,7 @@ For multi-session tasks, suggest:
 
 Return ONLY valid JSON:
 {
+    "smart_subject": "Concise, action-oriented title (max 60 chars) - CRITICAL for clarity",
     "domain": "Clinical|Research|Admin|Home|Hobby",
     "priority": "Critical|High|Normal|Low",
     "summary": "string",

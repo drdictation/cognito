@@ -50,7 +50,7 @@ export async function updateTaskDeadline(taskId: string, deadline: string) {
 
         if (error) throw error
 
-        revalidatePath('/')
+        // Removed revalidatePath - client handles UI update optimistically
         return { success: true }
     } catch (error) {
         console.error('Failed to update deadline:', error)
@@ -162,7 +162,7 @@ export async function updateTaskStatus(
         }
     }
 
-    revalidatePath('/')
+    // Removed revalidatePath - client handles UI update optimistically
     return { success: true, trelloUrl, doubleBookWarning }
 }
 
@@ -222,7 +222,7 @@ export async function tweakTask(
         // Don't fail the whole operation if logging fails
     }
 
-    revalidatePath('/')
+    // Removed revalidatePath - client handles UI update optimistically
     return { success: true }
 }
 
@@ -280,8 +280,7 @@ export async function rejectAndBlockSender(
         }
     }
 
-    revalidatePath('/')
-    revalidatePath('/admin')
+    // Removed revalidatePath - client handles UI update optimistically
     return { success: true }
 }
 

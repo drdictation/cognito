@@ -35,7 +35,7 @@ The TypeScript service parses forwarded email headers to identify the **original
 
 ---
 
-## 🚀 Phase 1-9: Complete System (Current)
+## 🚀 Phase 1-10: Complete System (Current)
 
 ### Features
 
@@ -63,6 +63,8 @@ The TypeScript service parses forwarded email headers to identify the **original
 - **Pending Schedule Items:** Decoupled list for triaging extracted calendar events independently of task approval.
 - **Conflict Override:** "Force Approve" capability for overlapping calendar events.
 - **Enhanced Tweak Capability:** Refined UI with visual selection feedback and manual adjustment of estimated task duration.
+- **Native Calendar (Phase 10):** Dedicated view with time-blocking, Google Calendar overlay, and interactive task execution.
+- **Time Tracking:** Live start/pause/resume timer to capture actual task duration for future AI learning.
 - **Live Updates:** Real-time task management.
 
 #### ⚡ Execution Engine

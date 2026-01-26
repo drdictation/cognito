@@ -2,30 +2,57 @@
 
 import { useRouter } from 'next/navigation'
 import { RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { triggerIngestion } from '@/lib/actions/ingest'
 import { toast } from 'sonner'
 
 export function RefreshButton() {
     const router = useRouter()
     const [isRefreshing, setIsRefreshing] = useState(false)
+    const [isAutoEnabled, setIsAutoEnabled] = useState(false)
+
+    // Auto-refresh effect
+    useEffect(() => {
+        let intervalId: NodeJS.Timeout
+
+        if (isAutoEnabled) {
+            // Initial run
+            if (!isRefreshing) handleRefresh()
+
+            // Poll every 60 seconds
+            intervalId = setInterval(() => {
+                if (!isRefreshing) handleRefresh()
+            }, 60000)
+        }
+
+        return () => {
+            if (intervalId) clearInterval(intervalId)
+        }
+    }, [isAutoEnabled])
 
     const handleRefresh = async () => {
+        if (isRefreshing) return
         setIsRefreshing(true)
 
         try {
             // 1. Trigger the python ingestion script
-            toast.info('Checking for new emails...')
+            // Only show toast if manual refresh to avoid spam
+            if (!isAutoEnabled) toast.info('Checking for new emails...')
+
             const result = await triggerIngestion()
 
             if (!result.success) {
-                toast.error('Failed to fetch new emails: ' + result.error)
+                console.error('Ingestion failed:', result.error)
+                if (!isAutoEnabled) toast.error('Failed: ' + result.error)
+            } else if (result.stats && result.stats.processed > 0) {
+                // Only toast on success if emails were actually processed or manual
+                toast.success(`Inbox updated: ${result.message}`)
             } else {
-                toast.success('Inbox updated')
+                if (!isAutoEnabled) toast.success('Inbox up to date')
             }
         } catch (e) {
             console.error(e)
-            toast.error('Failed to run ingestion')
+            if (!isAutoEnabled) toast.error('Failed to run ingestion')
         }
 
         // 2. Refresh the UI data
@@ -38,17 +65,33 @@ export function RefreshButton() {
     }
 
     return (
-        <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="btn-ghost flex items-center gap-2 self-start disabled:opacity-50"
-            aria-label="Refresh tasks"
-        >
-            <RefreshCw
-                size={18}
-                className={isRefreshing ? 'animate-spin' : ''}
-            />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-full border border-border/50">
+                <div className={`w-2 h-2 rounded-full ${isAutoEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                <label htmlFor="auto-refresh" className="text-xs font-medium cursor-pointer select-none">
+                    Auto
+                </label>
+                <input
+                    id="auto-refresh"
+                    type="checkbox"
+                    checked={isAutoEnabled}
+                    onChange={(e) => setIsAutoEnabled(e.target.checked)}
+                    className="toggle toggle-xs toggle-success"
+                />
+            </div>
+
+            <button
+                onClick={() => handleRefresh()}
+                disabled={isRefreshing}
+                className="btn-ghost flex items-center gap-2 disabled:opacity-50"
+                aria-label="Refresh tasks"
+            >
+                <RefreshCw
+                    size={18}
+                    className={isRefreshing ? 'animate-spin' : ''}
+                />
+                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+        </div>
     )
 }

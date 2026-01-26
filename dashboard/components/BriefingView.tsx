@@ -4,6 +4,7 @@ import { InboxTask, Domain, Priority, CognitoEventRow } from '@/lib/types/databa
 import { TaskCard } from './TaskCard'
 import { BumpNotificationBanner } from './BumpNotification'
 import { getBumpHistory } from '@/lib/actions/calendar-events'
+import { useTasks } from '@/contexts/TasksContext'
 import {
     Stethoscope,
     FlaskConical,
@@ -13,10 +14,6 @@ import {
     Inbox
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
-
-interface BriefingViewProps {
-    tasks: InboxTask[]
-}
 
 const domainIcons: Record<Domain, React.ReactNode> = {
     Clinical: <Stethoscope size={20} />,
@@ -43,7 +40,8 @@ const priorityOrder: Record<Priority, number> = {
 
 const domainOrder: Domain[] = ['Clinical', 'Research', 'Admin', 'Home', 'Hobby']
 
-export function BriefingView({ tasks }: BriefingViewProps) {
+export function BriefingView() {
+    const { tasks } = useTasks()
     const [activeFilter, setActiveFilter] = useState<Domain | 'all'>('all')
     const [bumpedEvents, setBumpedEvents] = useState<CognitoEventRow[]>([])
 

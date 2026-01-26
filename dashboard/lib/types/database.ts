@@ -40,6 +40,8 @@ export interface AIAssessment {
     deadline_source?: string | null
     // Phase 9b: Multi-session chunking
     multi_session?: MultiSessionSuggestion | null
+    // Phase 11: Auto-naming
+    smart_subject?: string
 }
 
 export type TaskStatus = 'pending' | 'approved' | 'rejected' | 'snoozed'
@@ -219,6 +221,56 @@ export interface ProtectedCalendar {
     created_at: string
 }
 
+// Phase 10: Time Tracking
+export type TimeLogStatus = 'running' | 'paused' | 'completed'
+export type TimeOfDay = 'morning' | 'afternoon' | 'evening'
+
+export interface TimeLog {
+    id: string
+    task_id: string | null
+    session_id: string | null
+    started_at: string
+    paused_at: string | null
+    completed_at: string | null
+    elapsed_seconds: number
+    ai_estimated_minutes: number | null
+    actual_minutes: number | null
+    accuracy_ratio: number | null
+    domain: Domain | null
+    priority: Priority | null
+    day_of_week: number
+    time_of_day: TimeOfDay
+    status: TimeLogStatus
+    created_at: string
+    updated_at: string
+}
+
+export interface CalendarTask {
+    id: string
+    subject: string | null
+    ai_domain: Domain | null
+    ai_priority: Priority | null
+    ai_estimated_minutes: number | null
+    scheduled_start: string | null
+    scheduled_end: string | null
+    trello_card_url: string | null
+    calendar_event_id: string | null
+    active_time_log_id: string | null
+    tracking_status: TimeLogStatus | null
+    started_at: string | null
+    elapsed_seconds: number | null
+    block_status: 'scheduled' | 'running' | 'paused' | 'completed'
+}
+
+export interface GoogleCalendarEvent {
+    id: string
+    title: string
+    start: string
+    end: string
+    calendarName: string
+    isReadOnly: true
+}
+
 export interface Database {
     public: {
         Tables: {
@@ -276,6 +328,11 @@ export interface Database {
                 Row: ProtectedCalendar
                 Insert: Omit<ProtectedCalendar, 'id' | 'created_at'>
                 Update: Partial<Omit<ProtectedCalendar, 'id' | 'created_at'>>
+            }
+            time_logs: {
+                Row: TimeLog
+                Insert: Omit<TimeLog, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<TimeLog, 'id' | 'created_at'>>
             }
         }
     }

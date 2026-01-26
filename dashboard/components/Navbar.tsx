@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Brain, LayoutDashboard, Settings, Menu, X, BookOpen } from 'lucide-react'
+import { Brain, LayoutDashboard, Settings, Menu, X, BookOpen, Calendar } from 'lucide-react'
 import { useState } from 'react'
 
 const navItems = [
     { href: '/', label: 'Briefing', icon: LayoutDashboard },
+    { href: '/calendar', label: 'Calendar', icon: Calendar },
     { href: '/knowledge', label: 'Knowledge', icon: BookOpen },
     { href: '/admin', label: 'Admin', icon: Settings },
 ]
