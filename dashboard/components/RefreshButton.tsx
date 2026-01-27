@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { RefreshCw } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { triggerIngestion } from '@/lib/actions/ingest'
+import { fixStuckTasks } from '@/lib/actions/fix-stuck'
 import { toast } from 'sonner'
 
 export function RefreshButton() {
@@ -49,6 +50,15 @@ export function RefreshButton() {
                 toast.success(`Inbox updated: ${result.message}`)
             } else {
                 if (!isAutoEnabled) toast.success('Inbox up to date')
+            }
+
+            // 2. Fix any stuck tasks (approved but execution incomplete)
+            const fixResult = await fixStuckTasks()
+            if (fixResult.fixed > 0) {
+                toast.success(`🔧 Fixed ${fixResult.fixed} stuck task${fixResult.fixed > 1 ? 's' : ''}`)
+            }
+            if (fixResult.failed > 0) {
+                toast.warning(`${fixResult.failed} task${fixResult.failed > 1 ? 's' : ''} could not be fixed`)
             }
         } catch (e) {
             console.error(e)

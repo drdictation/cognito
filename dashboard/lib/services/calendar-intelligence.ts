@@ -21,6 +21,36 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+/**
+ * Create a Date object for a specific time in Melbourne timezone.
+ * This ensures scheduling windows are interpreted correctly regardless of server timezone.
+ */
+function createMelbourneDate(year: number, month: number, day: number, hour: number, minute: number): Date {
+    // Find the UTC offset for Melbourne at this date by checking noon
+    const noonMelb = new Date(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00Z`)
+    const noonMelbStr = noonMelb.toLocaleString('en-US', {
+        timeZone: TIMEZONE,
+        hour12: false,
+        hour: '2-digit'
+    })
+    const noonMelbHour = parseInt(noonMelbStr)
+    const offset = noonMelbHour - 12 // Positive if Melbourne is ahead of UTC
+
+    // Apply offset to get UTC time
+    const utcHour = hour - offset
+    return new Date(Date.UTC(year, month, day, utcHour, minute, 0))
+}
+
+/**
+ * Set time on a date in Melbourne timezone
+ */
+function setMelbourneTime(date: Date, hour: number, minute: number): Date {
+    const year = parseInt(date.toLocaleString('en-US', { timeZone: TIMEZONE, year: 'numeric' }))
+    const month = parseInt(date.toLocaleString('en-US', { timeZone: TIMEZONE, month: 'numeric' })) - 1
+    const day = parseInt(date.toLocaleString('en-US', { timeZone: TIMEZONE, day: 'numeric' }))
+    return createMelbourneDate(year, month, day, hour, minute)
+}
+
 interface TimeSlot {
     start: Date
     end: Date
@@ -323,18 +353,17 @@ export async function findSlotWithBumping(
         // Try each window
         // CRITICAL: Preserve the loop date separately from 'current' which may be modified by conflict skipping
         const loopDate = new Date(current)
-        loopDate.setHours(0, 0, 0, 0) // Normalize to start of day
+        // Normalize to start of day in Melbourne timezone
+        const loopDateMelbourne = setMelbourneTime(loopDate, 0, 0)
 
         for (const window of windows) {
             const [startHour, startMin] = window.start_time.split(':').map(Number)
             const [endHour, endMin] = window.end_time.split(':').map(Number)
 
-            // Use loopDate for window boundaries to preserve correct date
-            const windowStart = new Date(loopDate)
-            windowStart.setHours(startHour, startMin, 0, 0)
-
-            const windowEnd = new Date(loopDate)
-            windowEnd.setHours(endHour, endMin, 0, 0)
+            // Create window boundaries in Melbourne timezone
+            // This ensures 20:00 means 8pm Melbourne, not 8pm UTC
+            const windowStart = setMelbourneTime(loopDateMelbourne, startHour, startMin)
+            const windowEnd = setMelbourneTime(loopDateMelbourne, endHour, endMin)
 
             console.log(`  Checking window: ${window.name} (${windowStart.toISOString()} - ${windowEnd.toISOString()})`)
 

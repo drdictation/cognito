@@ -297,10 +297,17 @@ export async function executeTask(taskId: string): Promise<ExecuteResult> {
     const listIds = await getListIds(boardId)
     const targetListId = determineTargetList(task as InboxTask, listIds)
 
-    // Create Trello card
-    const cardResult = await createTrelloCard(targetListId, boardId, task as InboxTask)
-    if (!cardResult) {
-        return { success: false, error: 'Failed to create Trello card' }
+    // Check if Trello card already exists (for retry scenarios)
+    let cardResult: TrelloCardResult | null = null
+    if (task.trello_card_id && task.trello_card_url) {
+        console.log('Trello card already exists, reusing:', task.trello_card_id)
+        cardResult = { cardId: task.trello_card_id, cardUrl: task.trello_card_url }
+    } else {
+        // Create Trello card
+        cardResult = await createTrelloCard(targetListId, boardId, task as InboxTask)
+        if (!cardResult) {
+            return { success: false, error: 'Failed to create Trello card' }
+        }
     }
 
     // Phase 3c: Check for linked sessions first (Multi-Session Handling)
