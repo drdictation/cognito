@@ -19,11 +19,16 @@ export async function fixStuckTasks(): Promise<FixStuckResult> {
     const supabase = createAdminClient()
 
     // Find stuck tasks: approved but execution never completed
+    // SAFEGUARD: Only look at tasks created in the last 48 hours to prevent
+    // re-executing ancient historical tasks (see incident_analysis.md)
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+
     const { data: stuckTasks, error } = await (supabase
         .from('inbox_queue') as any)
         .select('id, subject, trello_card_id')
         .eq('status', 'approved')
         .eq('execution_status', 'pending')
+        .gt('created_at', fortyEightHoursAgo)
 
     if (error) {
         console.error('Error querying stuck tasks:', error)

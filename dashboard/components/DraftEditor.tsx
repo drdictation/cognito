@@ -102,8 +102,43 @@ export function DraftEditor({ task }: DraftEditorProps) {
                 </button>
                 <button
                     onClick={() => {
-                        const subject = encodeURIComponent(`Re: ${task.subject || 'No Subject'}`)
-                        const body = encodeURIComponent(draft)
+                        // 1. Determine the best Subject Line
+                        let subjectLine = task.subject || 'No Subject'
+
+                        // Strategy A: Extract TRUE original subject from forwarded headers (Gold Standard)
+                        // This fixes the issue where "Smart Subject" replaced the original, confusing recipients.
+                        if (task.original_content) {
+                            const originalSubjectMatch = task.original_content.match(/Subject:\s*(.+)(\r?\n|$)/i)
+                            if (originalSubjectMatch) {
+                                subjectLine = originalSubjectMatch[1].trim()
+                            }
+                        }
+
+                        // Strategy B: If draft itself has a Subject line, uses that as fallback (if A failed)
+                        // Also CRITICAL: Remove this line from the body so it doesn't appear twice
+                        let mailtoBody = draft
+                        const draftSubjectMatch = draft.match(/^Subject:\s*(.+)/i)
+
+                        // Always clean the body of the Subject line
+                        if (draftSubjectMatch) {
+                            mailtoBody = draft.replace(/^Subject:\s*(.+)(\r?\n|$)/i, '').trim()
+
+                            // Only use as subject fallback if Strategy A failed (and checking if it's not just "No Subject")
+                            if (subjectLine === 'No Subject' || subjectLine === task.subject) {
+                                // Double check - often the AI writes the original subject here too.
+                                // If Strategy A missed it (e.g. malformed headers), this is a good backup.
+                                subjectLine = draftSubjectMatch[1].trim()
+                            }
+                        }
+
+                        // Ensure "Re:" prefix
+                        if (!subjectLine.toLowerCase().startsWith('re:')) {
+                            subjectLine = `Re: ${subjectLine}`
+                        }
+
+                        const subject = encodeURIComponent(subjectLine)
+                        const body = encodeURIComponent(mailtoBody)
+
                         // Reply to the real sender, NOT the user's own email if possible, or leave blank to let them decide
                         // Ideally we reply to task.real_sender, but sometimes it's complex.
                         // Let's rely on the user to check the TO address, but try to pre-fill it.
