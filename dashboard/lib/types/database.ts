@@ -33,6 +33,8 @@ export interface AIAssessment {
     reasoning: string
     suggested_action: string
     estimated_minutes: number
+    is_simple_response?: boolean
+    draft_response?: string | null
     // Phase 7b: Calendar intelligence
     detected_events?: DetectedEvent[]
     inferred_deadline?: string | null
@@ -75,7 +77,7 @@ export interface InboxTask {
     ai_deadline_source: string | null
     // Phase 7b: Deadline (consolidated)
     deadline: string | null
-    deadline_source: 'extracted' | 'default' | 'user_override' | null
+    deadline_source: 'extracted' | 'default' | 'user_override' | 'ai_inferred' | null
     // Phase 9a: Explicit Deadlines
     user_deadline: string | null
     // Phase 3a/3c: Execution tracking

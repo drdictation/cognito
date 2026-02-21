@@ -10,46 +10,44 @@ import { toast } from 'sonner'
 export function RefreshButton() {
     const router = useRouter()
     const [isRefreshing, setIsRefreshing] = useState(false)
-    const [isAutoEnabled, setIsAutoEnabled] = useState(false)
+    const [isAutoEnabled, setIsAutoEnabled] = useState(true)
 
     // Auto-refresh effect
     useEffect(() => {
         let intervalId: NodeJS.Timeout
 
         if (isAutoEnabled) {
-            // Initial run
-            if (!isRefreshing) handleRefresh()
+            // Initial refresh
+            router.refresh()
 
-            // Poll every 60 seconds
+            // Poll every 30 seconds (UI refresh only; ingestion happens via cron)
             intervalId = setInterval(() => {
-                if (!isRefreshing) handleRefresh()
-            }, 60000)
+                router.refresh()
+            }, 30000)
         }
 
         return () => {
             if (intervalId) clearInterval(intervalId)
         }
-    }, [isAutoEnabled])
+    }, [isAutoEnabled, router])
 
-    const handleRefresh = async () => {
+    const handleSyncNow = async () => {
         if (isRefreshing) return
         setIsRefreshing(true)
 
         try {
-            // 1. Trigger the python ingestion script
-            // Only show toast if manual refresh to avoid spam
-            if (!isAutoEnabled) toast.info('Checking for new emails...')
+            toast.info('Checking for new emails...')
 
             const result = await triggerIngestion()
 
             if (!result.success) {
                 console.error('Ingestion failed:', result.error)
-                if (!isAutoEnabled) toast.error('Failed: ' + result.error)
+                toast.error('Failed: ' + result.error)
             } else if (result.stats && result.stats.processed > 0) {
                 // Only toast on success if emails were actually processed or manual
                 toast.success(`Inbox updated: ${result.message}`)
             } else {
-                if (!isAutoEnabled) toast.success('Inbox up to date')
+                toast.success('Inbox up to date')
             }
 
             // 2. Fix any stuck tasks (approved but execution incomplete)
@@ -62,10 +60,10 @@ export function RefreshButton() {
             }
         } catch (e) {
             console.error(e)
-            if (!isAutoEnabled) toast.error('Failed to run ingestion')
+            toast.error('Failed to run ingestion')
         }
 
-        // 2. Refresh the UI data
+        // Refresh the UI data
         router.refresh()
 
         // Add a small cleanup delay for visual feedback
@@ -91,7 +89,7 @@ export function RefreshButton() {
             </div>
 
             <button
-                onClick={() => handleRefresh()}
+                onClick={() => handleSyncNow()}
                 disabled={isRefreshing}
                 className="btn-ghost flex items-center gap-2 disabled:opacity-50"
                 aria-label="Refresh tasks"
@@ -100,7 +98,7 @@ export function RefreshButton() {
                     size={18}
                     className={isRefreshing ? 'animate-spin' : ''}
                 />
-                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                {isRefreshing ? 'Syncing...' : 'Sync now'}
             </button>
         </div>
     )

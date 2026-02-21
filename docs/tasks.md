@@ -141,6 +141,18 @@
 - [ ] **Math Alert:** Conflict detection logic.
 - [ ] **Recurring Task Templates:** AI learns from repeated patterns.
 
+## 🔴 Incident Resolution: Calendar Scheduling [Completed]
+- [x] **Root Cause Analysis:** Identified logic flaw in `fix-stuck.ts` (unbounded query) and `execution.ts` (clamping past tasks to now).
+- [x] **Code Fixes:**
+  - [x] Added 48-hour safeguards to `fixStuckTasks`.
+  - [x] Prevented `RefreshButton` from triggering unsafe backfills.
+- [x] **Data Cleanup:**
+  - [x] Cleared flooded tasks from `inbox_queue` and `task_sessions`.
+  - [x] Deactivated orphaned `cognito_events`.
+- [x] **Sync Repair:**
+  - [x] Identified and resolved "Ghost" events (Cancelled in Google, Active in DB).
+  - [x] Implemented forceful sync/cleanup for discrepancies.
+
 
 ---
 

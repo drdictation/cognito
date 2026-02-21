@@ -51,6 +51,15 @@ function setMelbourneTime(date: Date, hour: number, minute: number): Date {
     return createMelbourneDate(year, month, day, hour, minute)
 }
 
+function getMelbourneDayOfWeek(date: Date): number {
+    const dayStr = date.toLocaleString('en-US', {
+        timeZone: TIMEZONE,
+        weekday: 'short'
+    })
+    const days: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+    return days[dayStr] ?? 0
+}
+
 interface TimeSlot {
     start: Date
     end: Date
@@ -333,7 +342,7 @@ export async function findSlotWithBumping(
 
     outerLoop:
     while (shouldContinue()) {
-        const dayOfWeek = current.getDay()
+        const dayOfWeek = getMelbourneDayOfWeek(current)
         const windows = await getSchedulingWindows(dayOfWeek, isCritical)
 
         console.log(`Day ${dayOfWeek} (${current.toDateString()}): ${windows.length} windows available`)
@@ -506,13 +515,12 @@ export async function findSlotWithBumping(
             checkDate.setDate(checkDate.getDate() + dayOffset)
             checkDate.setHours(0, 0, 0, 0)
 
-            const dayOfWeek = checkDate.getDay()
+            const dayOfWeek = getMelbourneDayOfWeek(checkDate)
             const windows = await getSchedulingWindows(dayOfWeek, true)
 
             for (const window of windows) {
                 const [startHour, startMin] = window.start_time.split(':').map(Number)
-                const windowStart = new Date(checkDate)
-                windowStart.setHours(startHour, startMin, 0, 0)
+                const windowStart = setMelbourneTime(checkDate, startHour, startMin)
 
                 // Skip if in the past
                 if (windowStart < now) continue
@@ -591,6 +599,20 @@ export async function bumpEvent(
             .select()
             .single()
 
+        if (cognitoEvent.task_id) {
+            try {
+                await (supabase
+                    .from('inbox_queue') as any)
+                    .update({
+                        scheduled_start: newSlot.start.toISOString(),
+                        scheduled_end: newSlot.end.toISOString()
+                    })
+                    .eq('id', cognitoEvent.task_id)
+            } catch (e) {
+                console.error('Failed to sync bumped event to inbox_queue:', e)
+            }
+        }
+
         return {
             success: true,
             bumpedEvents: updated ? [updated] : [],
@@ -648,6 +670,20 @@ export async function undoBump(eventId: string): Promise<boolean> {
                 updated_at: new Date().toISOString()
             })
             .eq('id', eventId)
+
+        if (cognitoEvent.task_id) {
+            try {
+                await (supabase
+                    .from('inbox_queue') as any)
+                    .update({
+                        scheduled_start: cognitoEvent.original_start,
+                        scheduled_end: cognitoEvent.original_end
+                    })
+                    .eq('id', cognitoEvent.task_id)
+            } catch (e) {
+                console.error('Failed to sync undo bump to inbox_queue:', e)
+            }
+        }
 
         return true
     } catch (e) {

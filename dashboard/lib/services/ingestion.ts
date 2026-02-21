@@ -146,8 +146,24 @@ async function checkBlocklist(sender: string): Promise<boolean> {
     }
 }
 
+const TIMEZONE = 'Australia/Melbourne'
+
+function getMelbourneDayAndHour(date: Date): { day: number; hour: number } {
+    const formatter = new Intl.DateTimeFormat('en-AU', {
+        timeZone: TIMEZONE,
+        weekday: 'short',
+        hour: 'numeric',
+        hour12: false
+    })
+    const parts = formatter.formatToParts(date)
+    const weekday = parts.find(p => p.type === 'weekday')?.value || 'Sun'
+    const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10)
+    const days: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+    return { day: days[weekday] ?? 0, hour }
+}
+
 /**
- * Check if current time is in No-Fly Zone (Friday 17:00 - Sunday 18:00)
+ * Check if current time is in No-Fly Zone (Friday 17:00 - Sunday 18:00, Melbourne time)
  */
 function isNoFlyZone(domain?: string): boolean {
     // Bypass for Home/Hobby domains
@@ -156,8 +172,7 @@ function isNoFlyZone(domain?: string): boolean {
     }
 
     const now = new Date()
-    const day = now.getDay() // 0 = Sunday, 6 = Saturday
-    const hour = now.getHours()
+    const { day, hour } = getMelbourneDayAndHour(now) // 0 = Sunday, 6 = Saturday
 
     // Friday after 17:00
     if (day === 5 && hour >= 17) {
@@ -227,7 +242,7 @@ export async function saveToInboxQueue(
         ai_inferred_deadline: assessment.inferred_deadline || null,
         ai_deadline_confidence: assessment.deadline_confidence || null,
         ai_deadline_source: assessment.deadline_source || null,
-        model_used: 'gemini-2.0-flash-lite',
+        model_used: 'gemini-2.5-flash-lite',
         is_simple_response: assessment.is_simple_response || false,
         draft_response: assessment.draft_response || null,
         execution_status: isAutoTask ? 'scheduled' : 'pending'

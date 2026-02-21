@@ -15,6 +15,31 @@ const supabaseAdmin = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const TIMEZONE = 'Australia/Melbourne'
+
+function createMelbourneDate(year: number, month: number, day: number, hour: number, minute: number): Date {
+    const noonMelb = new Date(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00Z`)
+    const noonMelbStr = noonMelb.toLocaleString('en-US', {
+        timeZone: TIMEZONE,
+        hour12: false,
+        hour: '2-digit'
+    })
+    const noonMelbHour = parseInt(noonMelbStr, 10)
+    const offset = noonMelbHour - 12
+    const utcHour = hour - offset
+    return new Date(Date.UTC(year, month, day, utcHour, minute, 0, 0))
+}
+
+function getMelbourneDayBounds(date: Date): { start: Date; end: Date } {
+    const year = parseInt(date.toLocaleString('en-US', { timeZone: TIMEZONE, year: 'numeric' }))
+    const month = parseInt(date.toLocaleString('en-US', { timeZone: TIMEZONE, month: 'numeric' })) - 1
+    const day = parseInt(date.toLocaleString('en-US', { timeZone: TIMEZONE, day: 'numeric' }))
+    const start = createMelbourneDate(year, month, day, 0, 0)
+    const end = createMelbourneDate(year, month, day, 23, 59)
+    end.setSeconds(59, 999)
+    return { start, end }
+}
+
 function getTimeOfDay(date: Date): TimeOfDay {
     const hour = date.getHours()
     if (hour < 12) return 'morning'
@@ -257,11 +282,7 @@ export async function getActiveTimeLog(): Promise<TimeLog | null> {
 export async function getCalendarTasks(date: Date, skipGoogleSync = true) {  // Default to TRUE - skip slow Google sync
     const supabase = supabaseAdmin
 
-    const startOfDay = new Date(date)
-    startOfDay.setHours(0, 0, 0, 0)
-
-    const endOfDay = new Date(date)
-    endOfDay.setHours(23, 59, 59, 999)
+    const { start: startOfDay, end: endOfDay } = getMelbourneDayBounds(date)
 
     // Get all tasks that have calendar events (regardless of stored scheduled_start)
     const { data, error } = await supabase
@@ -285,9 +306,8 @@ export async function getCalendarTasks(date: Date, skipGoogleSync = true) {  // 
             )
         `)
         .not('scheduled_start', 'is', null)    // Must have scheduled time
-        .not('scheduled_start', 'is', null)    // Must have scheduled time
-        // .gte('scheduled_start', startOfDay.toISOString())  // Temporarily removed to debug timezone
-        // .lte('scheduled_start', endOfDay.toISOString())    // Temporarily removed to debug timezone
+        .gte('scheduled_start', startOfDay.toISOString())
+        .lte('scheduled_start', endOfDay.toISOString())
         .order('scheduled_start', { ascending: true })
 
     if (error) {
@@ -303,7 +323,9 @@ export async function getCalendarTasks(date: Date, skipGoogleSync = true) {  // 
 
 function transformTask(task: any) {
     const activeLog = Array.isArray(task.time_logs) && task.time_logs.length > 0
-        ? task.time_logs[0]
+        ? task.time_logs
+            .slice()
+            .sort((a: any, b: any) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())[0]
         : null
 
     let blockStatus: 'scheduled' | 'running' | 'paused' | 'completed' = 'scheduled'

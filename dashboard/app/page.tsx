@@ -1,5 +1,5 @@
 import { getPendingTasks } from '@/lib/actions/tasks'
-import { BriefingView } from '@/components/BriefingView'
+import { InboxListView } from '@/components/InboxListView'
 import { NoFlyZoneIndicator } from '@/components/NoFlyZoneIndicator'
 import { RefreshButton } from '@/components/RefreshButton'
 import { AddTaskButton } from '@/components/AddTaskButton'
@@ -58,7 +58,7 @@ export default async function DailyBriefingPage() {
 
       {/* Briefing Content */}
       <TasksProvider initialTasks={tasks}>
-        <BriefingView />
+        <InboxListView />
       </TasksProvider>
 
       {/* Floating Add Task Button */}

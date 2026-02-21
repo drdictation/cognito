@@ -90,9 +90,13 @@ export async function approveDetectedEvent(eventId: string, override: boolean = 
             }
         } else if (event.is_all_day) {
             // All-day event
-            const date = new Date(event.proposed_start!).toISOString().split('T')[0]
-            eventData.start = { date }
-            eventData.end = { date }
+            const startDate = new Date(event.proposed_start!)
+            const endDate = new Date(startDate)
+            endDate.setDate(endDate.getDate() + 1)
+            const startStr = startDate.toISOString().split('T')[0]
+            const endStr = endDate.toISOString().split('T')[0]
+            eventData.start = { date: startStr }
+            eventData.end = { date: endStr }
         }
 
         if (event.location) {

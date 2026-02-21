@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { InboxTask } from '@/lib/types/database'
 
 interface TasksContextType {
@@ -14,6 +14,11 @@ const TasksContext = createContext<TasksContextType | null>(null)
 
 export function TasksProvider({ initialTasks, children }: { initialTasks: InboxTask[], children: ReactNode }) {
     const [tasks, setTasks] = useState(initialTasks)
+
+    // Keep client state in sync when the server re-renders (e.g. `router.refresh()` or cron-ingested items).
+    useEffect(() => {
+        setTasks(initialTasks)
+    }, [initialTasks])
 
     const removeTask = useCallback((taskId: string) => {
         setTasks(prev => prev.filter(t => t.id !== taskId))

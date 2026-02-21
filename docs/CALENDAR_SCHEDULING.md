@@ -79,3 +79,17 @@ Stores exact names of calendars that cannot be touched.
 ### Bumped Events
 - When an event is bumped, it is rescheduled with a **2-week extended deadline** to ensure it finds a new home without failing.
 - It will likely move to the next available free day (e.g., next week) if the current week is packed.
+
+---
+
+## Troubleshooting / Known Issues (Jan 2026 Observations)
+
+### 1. "Ghost" Events (Discrepancy between DB and Google)
+- **Symptom:** The App shows a task on the calendar, but Google Calendar looks empty for that slot.
+- **Cause:** The event was deleted in Google Calendar manually. Google marks it as `status: 'cancelled'` but hides it from the UI. The Cognito DB still thinks it is valid.
+- **Fix:** Any sync logic MUST checks `event.status === 'cancelled'`. If true, the `calendar_event_id` in `inbox_queue` must be cleared.
+
+### 2. "Time Travel" / Flooding
+- **Symptom:** Hundreds of old tasks suddenly appear on "Today".
+- **Cause:** Maintenance scripts (like `fixStuckTasks`) running unbounded queries on the whole database.
+- **Fix:** ALWAYS include date bounds (e.g., `created_at > last 48 hours`) in automated scripts. Never allow a "backfill" script to run automatically without guardrails.

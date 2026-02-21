@@ -89,6 +89,8 @@ Return ONLY valid JSON:
     "reasoning": "string",
     "suggested_action": "string",
     "estimated_minutes": integer,
+    "is_simple_response": boolean,
+    "draft_response": "string or null",
     "detected_events": [
         {
             "event_type": "meeting|deadline|appointment|reminder",
@@ -117,7 +119,7 @@ Return ONLY valid JSON:
 export async function analyzeTaskContent(content: string): Promise<AIAssessment | null> {
     try {
         // STRICT RULE: Only use Gemini 2.5 Flash Lite or newer
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
 
         // Get current date/time for context (Melbourne timezone)
         const now = new Date()
@@ -141,7 +143,7 @@ Respond with ONLY valid JSON matching the schema described. Include detected_eve
         const result = await model.generateContent({
             contents: [
                 { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-                { role: 'model', parts: [{ text: 'Understood. I will analyze tasks and return valid JSON with domain, priority, summary, reasoning, suggested_action, estimated_minutes, detected_events, inferred_deadline, deadline_confidence, and deadline_source.' }] },
+                { role: 'model', parts: [{ text: 'Understood. I will analyze tasks and return valid JSON with domain, priority, summary, reasoning, suggested_action, estimated_minutes, is_simple_response, draft_response, detected_events, inferred_deadline, deadline_confidence, and deadline_source.' }] },
                 { role: 'user', parts: [{ text: prompt }] }
             ],
             generationConfig: {

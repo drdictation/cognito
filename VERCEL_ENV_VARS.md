@@ -24,6 +24,18 @@ GOOGLE_REFRESH_TOKEN=<your-refresh-token-from-token.json>
 - `TRELLO_API_KEY`
 - `TRELLO_TOKEN`
 
+## Cron (auto-ingestion)
+
+To process emails automatically (Vercel Cron → `/api/cron/ingest`), add:
+
+```
+CRON_SECRET=<long-random-string>
+```
+
+Notes:
+- The cron endpoint accepts `Authorization: Bearer $CRON_SECRET` (or `?token=$CRON_SECRET` for manual testing).
+- Schedule is configured in `dashboard/vercel.json` (currently every 5 minutes).
+
 ## Notes
 
 - The refresh token may need to be regenerated periodically if it expires
