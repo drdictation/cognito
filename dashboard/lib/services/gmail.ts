@@ -102,9 +102,9 @@ function extractAttachments(part: GmailPart | null | undefined, attachments: Ema
 }
 
 /**
- * Fetch unread emails from Gmail
+ * Fetch unprocessed emails (either unread or subject:COGNITO, without processed label)
  */
-export async function fetchUnreadEmails(maxResults: number = 50): Promise<Email[]> {
+export async function fetchUnprocessedEmails(maxResults: number = 50): Promise<Email[]> {
     const gmail = await getGmailClient()
     if (!gmail) {
         console.error('Gmail client not available')
@@ -112,14 +112,15 @@ export async function fetchUnreadEmails(maxResults: number = 50): Promise<Email[
     }
 
     try {
+        const query = '(is:unread OR subject:COGNITO) -label:Cognito-Processed'
         const response = await gmail.users.messages.list({
             userId: 'me',
-            q: 'is:unread',
+            q: query,
             maxResults
         })
 
         const messages = response.data.messages || []
-        console.log(`Found ${messages.length} unread emails`)
+        console.log(`Found ${messages.length} unprocessed emails with query: ${query}`)
 
         const emails: Email[] = []
         for (const msg of messages) {
@@ -207,5 +208,66 @@ export async function markEmailAsRead(messageId: string): Promise<void> {
         console.log(`Marked email ${messageId} as read`)
     } catch (error) {
         console.error('Error marking email as read:', error)
+    }
+}
+
+/**
+ * Ensures the Cognito-Processed label exists, creates it if not, and returns its ID
+ */
+export async function getOrCreateProcessedLabel(): Promise<string | null> {
+    const gmail = await getGmailClient()
+    if (!gmail) return null
+
+    try {
+        const res = await gmail.users.labels.list({ userId: 'me' })
+        const labels = res.data.labels || []
+        const existing = labels.find(l => l.name === 'Cognito-Processed')
+
+        if (existing && existing.id) {
+            return existing.id
+        }
+
+        const createRes = await gmail.users.labels.create({
+            userId: 'me',
+            requestBody: {
+                name: 'Cognito-Processed',
+                labelListVisibility: 'labelShow',
+                messageListVisibility: 'show'
+            }
+        })
+        return createRes.data.id || null
+    } catch (error) {
+        console.error('Error getting/creating Cognito-Processed label:', error)
+        return null
+    }
+}
+
+/**
+ * Adds the Cognito-Processed label to an email (and marks as read)
+ */
+export async function labelEmailAsProcessed(messageId: string): Promise<void> {
+    const gmail = await getGmailClient()
+    if (!gmail) return
+
+    try {
+        const labelId = await getOrCreateProcessedLabel()
+        if (!labelId) {
+            console.error('Could not get label ID to process email')
+            await markEmailAsRead(messageId) // Fallback
+            return
+        }
+
+        await gmail.users.messages.modify({
+            userId: 'me',
+            id: messageId,
+            requestBody: {
+                addLabelIds: [labelId],
+                removeLabelIds: ['UNREAD']
+            }
+        })
+        console.log(`Applied Cognito-Processed label to email ${messageId}`)
+    } catch (error) {
+        console.error(`Error applying processed label to ${messageId}:`, error)
+        await markEmailAsRead(messageId) // Fallback
     }
 }

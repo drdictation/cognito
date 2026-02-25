@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { RefreshCw } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { triggerIngestion } from '@/lib/actions/ingest'
+import { beginSync, syncOneEmail, finishSync } from '@/lib/actions/ingest'
 import { fixStuckTasks } from '@/lib/actions/fix-stuck'
 import { toast } from 'sonner'
 
@@ -17,10 +17,7 @@ export function RefreshButton() {
         let intervalId: NodeJS.Timeout
 
         if (isAutoEnabled) {
-            // Initial refresh
             router.refresh()
-
-            // Poll every 30 seconds (UI refresh only; ingestion happens via cron)
             intervalId = setInterval(() => {
                 router.refresh()
             }, 30000)
@@ -36,37 +33,70 @@ export function RefreshButton() {
         setIsRefreshing(true)
 
         try {
-            toast.info('Checking for new emails...')
+            toast.info('Starting sync...', { id: 'sync' })
 
-            const result = await triggerIngestion()
+            const startRes = await beginSync()
+            if (!startRes.success) {
+                toast.error('Failed to start sync', { id: 'sync' })
+                return setIsRefreshing(false)
+            }
+            const logId = startRes.logId
 
-            if (!result.success) {
-                console.error('Ingestion failed:', result.error)
-                toast.error('Failed: ' + result.error)
-            } else if (result.stats && result.stats.processed > 0) {
-                // Only toast on success if emails were actually processed or manual
-                toast.success(`Inbox updated: ${result.message}`)
-            } else {
-                toast.success('Inbox up to date')
+            let processed = 0
+            let blocked = 0
+            let errors = 0
+            const errorDetails: { subject: string, error: string }[] = []
+
+            while (true) {
+                const res = await syncOneEmail()
+
+                if (!res.success) {
+                    errors++
+                    errorDetails.push({ subject: 'Unknown', error: res.error || 'Network error' })
+                    break // Stop on hard network errors
+                }
+
+                const data = res as any
+                if (data.done) {
+                    break // No more emails!
+                }
+
+                if (data.status === 'processed') processed++
+                else if (data.status === 'blocked') blocked++
+                else if (data.status === 'error') {
+                    errors++
+                    errorDetails.push({ subject: data.subject || 'Unknown', error: data.error || 'Task failed' })
+                }
+
+                toast.loading(`Synced: ${processed}, Failed: ${errors} (${data.subject?.substring(0, 30)}...)`, { id: 'sync' })
             }
 
-            // 2. Fix any stuck tasks (approved but execution incomplete)
+            const total = processed + blocked + errors;
+
+            if (logId) {
+                await finishSync(logId, { processed, blocked, errors, found: total }, errorDetails)
+            }
+
+            if (total === 0) {
+                toast.success('Inbox up to date', { id: 'sync' })
+            } else if (errors === 0) {
+                toast.success(`Sync complete: Processed ${processed}${blocked > 0 ? `, Blocked ${blocked}` : ''}`, { id: 'sync' })
+            } else {
+                toast.warning(`Sync finished with ${errors} error(s). Processed ${processed}`, { id: 'sync' })
+            }
+
+            // Fix stuck tasks
             const fixResult = await fixStuckTasks()
             if (fixResult.fixed > 0) {
-                toast.success(`🔧 Fixed ${fixResult.fixed} stuck task${fixResult.fixed > 1 ? 's' : ''}`)
-            }
-            if (fixResult.failed > 0) {
-                toast.warning(`${fixResult.failed} task${fixResult.failed > 1 ? 's' : ''} could not be fixed`)
+                toast.success(`🔧 Fixed ${fixResult.fixed} stuck task(s)`)
             }
         } catch (e) {
             console.error(e)
-            toast.error('Failed to run ingestion')
+            toast.error('Failed to run ingestion', { id: 'sync' })
         }
 
-        // Refresh the UI data
         router.refresh()
 
-        // Add a small cleanup delay for visual feedback
         setTimeout(() => {
             setIsRefreshing(false)
         }, 1000)

@@ -195,3 +195,28 @@ select
 from inbox_queue
 where status = 'pending'
 group by ai_domain;
+
+-- =====================================================
+-- INGESTION LOG - Phase 12
+-- Tracks email sync execution results
+-- =====================================================
+create table if not exists ingestion_log (
+  id uuid default gen_random_uuid() primary key,
+  created_at timestamp with time zone default now(),
+  source text not null default 'manual_sync',
+  emails_found int default 0,
+  processed int default 0,
+  blocked int default 0,
+  errors int default 0,
+  error_details jsonb,
+  duration_ms int,
+  status text default 'success' check (status in ('success', 'partial', 'failed'))
+);
+
+create index if not exists idx_ingestion_log_created on ingestion_log(created_at desc);
+
+alter table ingestion_log enable row level security;
+
+create policy "Enable all for service role" on ingestion_log
+  using (true)
+  with check (true);

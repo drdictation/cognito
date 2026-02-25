@@ -1,36 +1,32 @@
 'use server'
 
-import { processEmails } from '@/lib/services/ingestion'
+import { processNextEmail, createIngestionLog, updateIngestionLog } from '@/lib/services/ingestion'
 
-export async function triggerIngestion() {
+export async function beginSync() {
     try {
-        console.log('🔄 Triggering email ingestion...')
+        console.log('🔄 Starting manual sync...')
+        const id = await createIngestionLog()
+        return { success: true, logId: id }
+    } catch (e) {
+        return { success: false, error: 'Failed to start sync' }
+    }
+}
 
-        const result = await processEmails()
+export async function syncOneEmail() {
+    try {
+        const result = await processNextEmail()
+        return { success: true, ...result }
+    } catch (e) {
+        return { success: false, error: 'Network error or timeout' }
+    }
+}
 
-        if (result.success) {
-            console.log(`✅ Ingestion complete: ${result.message}`)
-            return {
-                success: true,
-                message: result.message,
-                stats: {
-                    processed: result.processed,
-                    blocked: result.blocked,
-                    errors: result.errors
-                }
-            }
-        } else {
-            console.error(`❌ Ingestion failed: ${result.message}`)
-            return {
-                success: false,
-                error: result.message
-            }
-        }
-    } catch (error: any) {
-        console.error('Ingestion failed:', error)
-        return {
-            success: false,
-            error: error.message || 'Failed to populate inbox'
-        }
+export async function finishSync(logId: string, stats: { processed: number, blocked: number, errors: number, found: number }, errorDetails: { subject: string, error: string }[]) {
+    try {
+        if (!logId) return { success: true };
+        await updateIngestionLog(logId, stats, errorDetails)
+        return { success: true }
+    } catch (e) {
+        return { success: false, error: 'Failed to log completion' }
     }
 }
