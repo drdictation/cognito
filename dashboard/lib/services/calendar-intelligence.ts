@@ -191,6 +191,33 @@ export async function getConflicts(
             }
         }
 
+        // Fix race condition during batch syncing:
+        // Google Calendar API is eventually consistent and won't immediately return events we just created.
+        // We must also query our local database for newly created events.
+        const { data: localEvents } = await (supabase
+            .from('cognito_events') as any)
+            .select('id, title, google_event_id, scheduled_start, scheduled_end')
+            .eq('is_active', true)
+            .lt('scheduled_start', proposedEnd.toISOString())
+            .gt('scheduled_end', proposedStart.toISOString())
+
+        if (localEvents && localEvents.length > 0) {
+            for (const local of localEvents) {
+                // Only add if not already returned by Google Calendar API
+                const alreadyFound = conflicts.some(c => c.eventId === local.google_event_id)
+                if (!alreadyFound) {
+                    console.log(`    Catching local race condition conflict: ${local.title}`)
+                    conflicts.push({
+                        eventId: local.google_event_id || local.id,
+                        summary: local.title || 'Cognito Task',
+                        start: new Date(local.scheduled_start),
+                        end: new Date(local.scheduled_end),
+                        isProtected: false
+                    })
+                }
+            }
+        }
+
         return conflicts
     } catch (e) {
         console.error('Failed to get conflicts:', e)
