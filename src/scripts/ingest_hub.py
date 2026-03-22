@@ -65,7 +65,7 @@ CENTRAL_HUB_EMAIL = os.getenv('CENTRAL_HUB_EMAIL', 'chamarabfwd@gmail.com')
 
 # Gemini model configuration
 # CRITICAL: NO GEMINI MODEL BEFORE 2.5 SHOULD EVER BE CODED.
-GEMINI_MODEL = 'gemini-2.5-flash-lite'
+GEMINI_MODEL = 'gemini-3.1-flash-lite-preview'
 
 def load_system_prompt() -> str:
     """Load the refined system prompt from the markdown file."""

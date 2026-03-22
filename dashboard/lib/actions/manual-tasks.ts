@@ -47,7 +47,7 @@ export async function createManualTask(content: string): Promise<CreateTaskResul
             ai_deadline_confidence: assessment.deadline_confidence || null,
             ai_deadline_source: assessment.deadline_source || null,
             status: 'pending',
-            model_used: 'gemini-2.0-flash-lite',
+            model_used: 'gemini-3.1-flash-lite-preview',
         }
 
         // Insert into inbox_queue (using any to bypass strict typing since DB has more fields)

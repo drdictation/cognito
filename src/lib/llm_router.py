@@ -22,7 +22,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Constants
-GEMINI_MODEL_FAST = "gemini-2.0-flash-lite-preview-02-05"
+GEMINI_MODEL_FAST = "gemini-3.1-flash-lite-preview"
 
 # Thinking Models (User Specified Exact Strings)
 MODEL_GPT_OSS_20B = "openai/gpt-oss-20b"

@@ -408,7 +408,7 @@ SELECT EXISTS (
 
 ### 4. Gemini AI Analysis
 
-**Model:** `gemini-2.5-flash-lite` (Chosen for speed, ultra-low cost, and thinking capabilities)
+**Model:** `gemini-3.1-flash-lite-preview` (Chosen for speed, ultra-low cost, and thinking capabilities)
 
 > [!IMPORTANT]
 > **STRICT MODEL RULE:** NO GEMINI MODEL BEFORE 2.5 SHOULD EVER BE CODED IN THIS PROJECT.

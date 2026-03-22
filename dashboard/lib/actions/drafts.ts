@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { revalidatePath } from 'next/cache'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
+const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' })
 
 export async function saveDraft(taskId: string, draft: string) {
     const supabase = createAdminClient()

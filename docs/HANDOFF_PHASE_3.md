@@ -107,7 +107,7 @@ AI-powered slot finder:
 ## ⚠️ Safety Rules
 - **Idempotency:** Store `trello_card_id` to prevent duplicates
 - **Failures:** Log errors, keep `execution_status='pending'` for retry
-- **Model Rule:** STRICTLY `gemini-2.5-flash-lite` or newer
+- **Model Rule:** STRICTLY `gemini-3.1-flash-lite-preview` or newer
 
 ---
 

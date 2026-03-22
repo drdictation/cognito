@@ -118,8 +118,8 @@ Return ONLY valid JSON:
 
 export async function analyzeTaskContent(content: string): Promise<AIAssessment | null> {
     try {
-        // STRICT RULE: Only use Gemini 2.5 Flash Lite or newer
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
+        // STRICT RULE: Only use Gemini 3.1 Flash Lite Preview or newer
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' })
 
         // Get current date/time for context (Melbourne timezone)
         const now = new Date()

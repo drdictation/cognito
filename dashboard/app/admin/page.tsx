@@ -54,7 +54,7 @@ export default async function AdminPage() {
                             <ul className="space-y-2 text-sm">
                                 <li className="flex justify-between">
                                     <span className="text-muted-foreground">AI Model</span>
-                                    <span className="font-mono text-foreground">gemini-2.5-flash-lite</span>
+                                    <span className="font-mono text-foreground">gemini-3.1-flash-lite-preview</span>
                                 </li>
                                 <li className="flex justify-between">
                                     <span className="text-muted-foreground">Database</span>

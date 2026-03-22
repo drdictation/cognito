@@ -164,7 +164,7 @@
 - [ ] Add `GOOGLE_AI_API_KEY` to `.env`
 - [ ] Test with `curl` or Python script
 - [ ] Verify free tier quota (1M tokens/month)
-- [ ] **STRICT RULE:** Ensure `gemini-2.5-flash-lite` is used. NO MODEL BEFORE 2.5 ALLOWED.
+- [ ] **STRICT RULE:** Ensure `gemini-3.1-flash-lite-preview` is used. NO MODEL BEFORE 3.1 ALLOWED.
 
 ### 2. Gmail API Setup
 - [ ] Create GCP project at https://console.cloud.google.com/

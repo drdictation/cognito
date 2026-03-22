@@ -185,7 +185,7 @@ export async function saveToInboxQueue(
         ai_inferred_deadline: assessment.inferred_deadline || null,
         ai_deadline_confidence: assessment.deadline_confidence || null,
         ai_deadline_source: assessment.deadline_source || null,
-        model_used: 'gemini-2.5-flash-lite',
+        model_used: 'gemini-3.1-flash-lite-preview',
         is_simple_response: assessment.is_simple_response || false,
         draft_response: assessment.draft_response || null,
         execution_status: isAutoTask ? 'scheduled' : 'pending'
