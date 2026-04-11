@@ -18,8 +18,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Cognito | Daily Briefing",
-  description: "AI Executive Assistant for Decision Support",
+  title: "Cognito | Trello Planning",
+  description: "AI task enrichment and planning on top of Trello",
   icons: {
     icon: '/favicon.ico',
   },

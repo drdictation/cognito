@@ -6,7 +6,7 @@ import { Brain, LayoutDashboard, Settings, Menu, X, BookOpen, Calendar } from 'l
 import { useState } from 'react'
 
 const navItems = [
-    { href: '/', label: 'Briefing', icon: LayoutDashboard },
+    { href: '/', label: 'Planning', icon: LayoutDashboard },
     { href: '/calendar', label: 'Calendar', icon: Calendar },
     { href: '/knowledge', label: 'Knowledge', icon: BookOpen },
     { href: '/admin', label: 'Admin', icon: Settings },
@@ -27,7 +27,7 @@ export function Navbar() {
                         </div>
                         <div>
                             <h1 className="text-lg font-bold text-foreground tracking-tight">Cognito</h1>
-                            <p className="text-xs text-muted-foreground -mt-0.5">Executive Assistant</p>
+                            <p className="text-xs text-muted-foreground -mt-0.5">Trello Planning Layer</p>
                         </div>
                     </Link>
 

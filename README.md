@@ -1,88 +1,73 @@
-# Cognito - AI Executive Assistant
+# Cognito - Trello Task Enrichment and Planning
 
 > **"The AI proposes; the user disposes."**
 
-Cognito is a bespoke AI Executive Assistant designed to reduce cognitive load for a Consultant Gastroenterologist. It processes emails from multiple sources, analyzes them with Google Gemini Flash, and presents a "Daily Briefing" for user approval—**without taking autonomous actions**.
+Cognito is being refocused into a **Trello-centric task enrichment and planning layer**. Outlook remains the email client, Trello remains the durable task store, and Cognito improves Trello cards after capture instead of trying to become a second inbox.
 
 ---
 
 ## 🎯 Core Philosophy
 
-**Decision Support First, Automation Later**
+**Capture Outside Cognito. Planning Inside Cognito.**
 
-- ✅ AI analyzes and proposes
-- ✅ User reviews and approves
-- ❌ No autonomous execution (Phase 1)
+- ✅ Outlook stays the communication home
+- ✅ Trello native email-to-board handles capture
+- ✅ Cognito rewrites vague Trello cards into actionable work
+- ✅ User confirms plans before cards move into `Today`
+- ❌ Cognito is not on the critical path for capture
+- ❌ Cognito does not silently auto-schedule work onto the calendar
 
 ## 🏗️ Architecture Overview
 
 ```
-6 Email Sources → Central Gmail Hub → TypeScript Ingestion Service → Gemini AI → Supabase
+Outlook / Phone → Trello Email-to-Board → Trello Inbox → Cognito Enrichment → Proposed Plan → User Confirm → Today
 ```
 
-### The Email Funnel
+### Current Default Flow
 
-Instead of managing 6 different API connections, all emails are auto-forwarded to a **Central Hub Gmail** account (`chamarabfwd@gmail.com`):
+1. The user reads and clears email in Outlook.
+2. If an email becomes work, it is forwarded into Trello using native email-to-board.
+3. Trello creates a raw card in `Inbox` with the original body and attachments.
+4. Cognito reads Trello `Inbox`, rewrites the title, and prepends an additive AI summary block.
+5. Cognito generates an evening plan or “I have X minutes” shortlist.
+6. The user confirms the selection, then Cognito moves those cards into `Today`.
 
-1. **M365 A** (Hospital) - Clinical
-2. **M365 B** (University) - Research
-3. **Gmail A** (Personal) - Home
-4. **Gmail B** (Project/Dev) - Hobby
-5. **Gmail C** (Private Practice) - Clinical
-6. **Hotmail** (Legacy) - Home
+### Trello Board Shape
 
-The TypeScript service parses forwarded email headers to identify the **original sender** and source account.
+- `Inbox`
+- `Today`
+- `This Week`
+- `Waiting`
+- `Later`
+- `Done`
 
 ---
 
-## 🚀 Phase 1-10: Complete System (Current)
+## 🚀 Current Product Shape
 
 ### Features
 
 #### 🧠 Intelligence Layer
-- **Multi-Model Routing:** 
-    - **Gemini 2.0 Flash Lite** (Speed/Cost/Reasoning)
-- **Email Analysis:** Domain classification, Priority scoring (Eisenhower Matrix), Summary generation.
-- **Draft Generation:** Auto-drafts responses for "Simple" emails (signed as "Chamara").
-- **Manual Task Analysis:** Real-time classification of hand-written or dictated notes.
-- **Smart Calendar Detection:** AI extracts calendar events (meetings, deadlines, appointments) directly from email content.
-- **Dynamic Deadline Inference:** Priority-based deadline assignments with task-specific logic (e.g., "invited talks").
-- **Multi-Session Detection:** AI identifies tasks requiring multiple sessions and suggests optimal chunking parameters.
+- **Trello Inbox Enrichment:** Rewrites vague card names into conservative action-oriented titles.
+- **Additive AI Summary Block:** Prepends summary, next action, task type, effort, due date, and priority while preserving the original forwarded email below.
+- **Processed-State Guardrail:** Uses an `AI Processed` label and embedded marker to avoid reprocessing the same card repeatedly.
+- **Conservative Due Date Inference:** Only writes dates when explicit or high-confidence.
+- **Planning Heuristics:** Generates evening plans and exact-time-window plans from open Trello cards.
 
 #### 🖥️ Dashboard (Next.js)
-- **Daily Briefing:** Approve/Reject/Snooze/Tweak tasks.
-- **Draft Editor:** Review, edit, and regenerate AI drafts.
-- **Calendar Event Cards:** AI-detected event suggestions with conflict warnings and one-click approval.
-- **Deadline Editor:** Set explicit deadlines with date/time picker or let AI infer from content.
-- **Session Chunking UI:** Review and configure multi-session task breakdowns.
-- **"Reply Now":** One-click opening of local email client.
-- **Manual Add:** Floating action button for quick text/voice ingestion.
-- **Knowledge Base:** Editable domain-specific "cheat sheets" to train the AI's judgment and tone.
-- **Proactive Learning:** AI proposes new rules and contacts based on your approval patterns.
-- **Bump Notifications:** Visual alerts for rescheduled tasks with "Undo" capabilities.
-- **Pending Schedule Items:** Decoupled list for triaging extracted calendar events independently of task approval.
-- **Conflict Override:** "Force Approve" capability for overlapping calendar events.
-- **Enhanced Tweak Capability:** Refined UI with visual selection feedback and manual adjustment of estimated task duration.
-- **Native Calendar (Phase 10):** Dedicated view with time-blocking, Google Calendar overlay, and interactive task execution.
-- **Time Tracking:** Live start/pause/resume timer to capture actual task duration for future AI learning.
-- **Live Updates:** Real-time task management.
+- **Planning Home:** Trello-first dashboard with Inbox visibility, `Today` visibility, and plan generation controls.
+- **Enrich Inbox:** One-click processing for raw cards in Trello `Inbox`.
+- **Plan Confirmation:** Proposed cards stay reviewable until the user moves selected items into `Today`.
+- **Time Window Filters:** Supports “I have X minutes”, low-energy, urgent-only, exclude-replies, and deep-work-only planning.
 
-#### ⚡ Execution Engine
-- **Trello Integration:** Approved tasks automatically create Trello cards with rich context (Summary, Suggestions, and full email content via recursive MIME extraction).
-- **Trello Guardrails:** Built-in protection against API limits with automatic 16,384-character description truncation.
-- **Intelligent Calendar Scheduling:**
-    - **Database-Driven Windows:** Flexible scheduling windows stored in Supabase (morning, evening, critical overflow).
-    - **Smart Conflict Detection:** All-day family events ignored; timed events respected.
-    - **Priority Bumping:** Critical tasks can bump High/Normal/Low events; Critical tasks never double-book.
-    - **Extended Deadline for Bumped Events:** Bumped tasks use 2-week window to find new slots.
-    - **Protected Events:** Events on "ICLOUD" calendars are automatically shielded from being bumped.
-- **Multi-Session Scheduling:** Individual sessions tracked and scheduled separately with configurable cadence.
+#### ⚡ Execution Model
+- **Trello Is The Task Store:** Cognito edits cards in place instead of creating a second review queue.
+- **Graceful Failure:** If Cognito is down, the raw Trello card and attachments still exist.
+- **No Silent Calendar Writes:** Planning quality is prioritized ahead of autonomous scheduling.
 
-#### 🛡️ Ingestion Pipeline
-- **Central Hub:** Aggregates 6 email sources.
-- **TypeScript Core:** Native processing within Next.js (Vercel-ready).
-- **Blocklist:** Filters spam/newsletters.
-- **No-Fly Zone:** Silent ingestion during weekends (Friday 17:00 - Sunday 18:00).
+#### 🧱 Legacy Surfaces
+- The older Gmail/Supabase ingestion pipeline and calendar-heavy execution code still exist in the repo.
+- The default dashboard now targets the Trello-centric workflow instead of the old email briefing model.
 
 ---
 
@@ -122,7 +107,7 @@ Create a `.env` file in the root directory:
 GOOGLE_AI_API_KEY=AIzaSy...
 GROQ_API_KEY=gsk_...
 
-# Google Cloud (Gmail/Calendar)
+# Google Cloud (used by legacy Gmail/calendar flows and by Gemini)
 GOOGLE_CLIENT_ID=your_client_id
 GOOGLE_CLIENT_SECRET=your_client_secret
 GOOGLE_REFRESH_TOKEN=your_refresh_token
@@ -134,6 +119,7 @@ SUPABASE_SERVICE_KEY=your_service_role_key
 # Trello
 TRELLO_API_KEY=your_key
 TRELLO_TOKEN=your_token
+TRELLO_BOARD_NAME=Cognito Task Queue
 
 # Config
 CENTRAL_HUB_EMAIL=chamarabfwd@gmail.com
@@ -141,13 +127,13 @@ CENTRAL_HUB_EMAIL=chamarabfwd@gmail.com
 
 ### 4. Running the System
 
-**Dashboard & Ingestion:**
+**Dashboard:**
 ```bash
 cd dashboard
 npm run dev
 # Open http://localhost:3000
 ```
-Ingestion is triggered via the **Refresh** button on the dashboard.
+The default home route loads the Trello planning workspace and can enrich `Inbox` cards in place.
 
 ---
 
