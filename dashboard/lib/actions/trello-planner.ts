@@ -51,6 +51,7 @@ export async function enrichInboxCardsAction(limit = 10): Promise<{
 
         for (const card of cards) {
             try {
+                const labels = Array.isArray(card.labels) ? card.labels : []
                 const dueDate = card.due ? new Date(card.due).toISOString().slice(0, 10) : null
                 const enrichment = await analyzeTrelloCard(card.name, card.rawContent)
                 const finalEnrichment = enrichment || fallbackEnrichment(card.name, card.rawContent, dueDate)
@@ -62,7 +63,7 @@ export async function enrichInboxCardsAction(limit = 10): Promise<{
                     due: finalEnrichment.dueDate ? new Date(finalEnrichment.dueDate).toISOString() : card.due,
                 })
 
-                if (!card.labels.some((label) => label.name === AI_PROCESSED_LABEL)) {
+                if (!labels.some((label) => label.name === AI_PROCESSED_LABEL)) {
                     await addLabelToCard(card.id, processedLabel.id)
                 }
 

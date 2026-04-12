@@ -111,9 +111,21 @@ export async function ensurePlanningLists(boardId: string): Promise<Record<Trell
 }
 
 export async function fetchBoardCards(boardId: string): Promise<TrelloCard[]> {
-    return trelloFetch<TrelloCard[]>(
+    const cards = await trelloFetch<TrelloCard[]>(
         `/boards/${boardId}/cards/open?fields=name,desc,url,due,idList,dateLastActivity,idAttachmentCover&attachments=false&members=false&labels=all`,
     )
+
+    return (cards || []).map((card) => ({
+        ...card,
+        name: card?.name || 'Untitled card',
+        desc: card?.desc || '',
+        url: card?.url || '',
+        due: card?.due || null,
+        idList: card?.idList || '',
+        dateLastActivity: card?.dateLastActivity || new Date(0).toISOString(),
+        idAttachmentCover: card?.idAttachmentCover || null,
+        labels: Array.isArray(card?.labels) ? card.labels : [],
+    }))
 }
 
 export async function moveCardToList(cardId: string, listId: string): Promise<void> {
@@ -137,7 +149,8 @@ export async function updateCard(cardId: string, updates: { name?: string; desc?
 
 export async function ensureLabel(boardId: string, name: string, color: string): Promise<TrelloLabel> {
     const labels = await trelloFetch<TrelloLabel[]>(`/boards/${boardId}/labels?fields=name,color`)
-    const existing = labels.find((label) => label.name === name)
+    const safeLabels = Array.isArray(labels) ? labels : []
+    const existing = safeLabels.find((label) => label.name === name)
     if (existing) return existing
 
     return trelloFetch<TrelloLabel>(
@@ -151,10 +164,13 @@ export async function addLabelToCard(cardId: string, labelId: string): Promise<v
 }
 
 export function hasProcessedMarker(card: Pick<TrelloCard, 'desc' | 'labels'>): boolean {
-    if (card.desc.includes(AI_MARKER) || card.desc.includes(AI_SUMMARY_HEADER)) {
+    const description = card?.desc || ''
+    const labels = Array.isArray(card?.labels) ? card.labels : []
+
+    if (description.includes(AI_MARKER) || description.includes(AI_SUMMARY_HEADER)) {
         return true
     }
-    return card.labels.some((label) => label.name === AI_PROCESSED_LABEL)
+    return labels.some((label) => label.name === AI_PROCESSED_LABEL)
 }
 
 export function extractOriginalContent(description: string): string {
